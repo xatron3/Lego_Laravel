@@ -3,6 +3,8 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useModelLoader } from "../hooks/useModelLoader";
 import StepControls from "../components/StepControls";
+import StepPreview from "../components/StepPreview";
+import PartsList from "../components/PartsList";
 import Scene from "../Scene";
 import { api, LegoModelData } from "../api";
 
@@ -15,6 +17,14 @@ export default function Home() {
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [modelName, setModelName] = useState("");
     const [modelDescription, setModelDescription] = useState("");
+    const [showGhostParts, setShowGhostParts] = useState(false);
+    const [dimPreviousSteps, setDimPreviousSteps] = useState(true);
+    const [previousStepsOpacity, setPreviousStepsOpacity] = useState(0.2);
+    const [isLoadingModel, setIsLoadingModel] = useState(false);
+    const [loadingProgress, setLoadingProgress] = useState({
+        loaded: 0,
+        total: 0,
+    });
 
     useEffect(() => {
         loadSavedModels();
@@ -96,6 +106,14 @@ export default function Home() {
     const handlePrevious = () => setCurrentStep((s) => Math.max(0, s - 1));
     const handleNext = () =>
         setCurrentStep((s) => Math.min(steps.length - 1, s + 1));
+    const handleStepClick = (step: number) => setCurrentStep(step);
+    const handleLoadingChange = (
+        isLoading: boolean,
+        progress: { loaded: number; total: number },
+    ) => {
+        setIsLoadingModel(isLoading);
+        setLoadingProgress(progress);
+    };
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
@@ -111,7 +129,8 @@ export default function Home() {
             </header>
 
             <div className="container mx-auto px-4 py-6 flex gap-6">
-                <aside className="w-72 shrink-0">
+                {/* Left Sidebar - Saved Models */}
+                <aside className="w-72 shrink-0 space-y-4">
                     <div className="bg-gray-800 rounded-xl p-4 shadow-lg">
                         <h2 className="text-lg font-semibold mb-4 text-yellow-400">
                             Saved Models
@@ -121,7 +140,7 @@ export default function Home() {
                                 No saved models yet
                             </p>
                         ) : (
-                            <ul className="space-y-2 max-h-96 overflow-y-auto">
+                            <ul className="space-y-2 max-h-64 overflow-y-auto">
                                 {savedModels.map((model) => (
                                     <li
                                         key={model.id}
@@ -169,10 +188,37 @@ export default function Home() {
                             </ul>
                         )}
                     </div>
+
+                    {/* Step Controls - moved to sidebar when model loaded */}
+                    {steps.length > 0 && (
+                        <StepControls
+                            currentStep={currentStep}
+                            totalSteps={steps.length}
+                            onPrevious={handlePrevious}
+                            onNext={handleNext}
+                            showGhostParts={showGhostParts}
+                            onToggleGhostParts={() =>
+                                setShowGhostParts(!showGhostParts)
+                            }
+                            dimPreviousSteps={dimPreviousSteps}
+                            onToggleDimPreviousSteps={() =>
+                                setDimPreviousSteps(!dimPreviousSteps)
+                            }
+                            previousStepsOpacity={previousStepsOpacity}
+                            onOpacityChange={setPreviousStepsOpacity}
+                        />
+                    )}
+
+                    {/* Parts List */}
+                    {steps.length > 0 && (
+                        <PartsList steps={steps} currentStep={currentStep} />
+                    )}
                 </aside>
 
-                <main className="flex-1">
-                    <div className="flex flex-wrap items-center gap-4 mb-6">
+                {/* Main Content */}
+                <main className="flex-1 flex flex-col gap-4">
+                    {/* Top toolbar */}
+                    <div className="flex flex-wrap items-center gap-4">
                         <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors">
                             <svg
                                 className="w-5 h-5"
@@ -243,24 +289,17 @@ export default function Home() {
                             </>
                         )}
 
-                        {steps.length > 0 && (
-                            <StepControls
-                                currentStep={currentStep}
-                                totalSteps={steps.length}
-                                onPrevious={handlePrevious}
-                                onNext={handleNext}
-                            />
-                        )}
                         {currentFileName && (
-                            <span className="text-gray-400 text-sm">
+                            <span className="text-gray-400 text-sm ml-auto">
                                 {currentFileName}
                             </span>
                         )}
                     </div>
 
+                    {/* 3D Viewer */}
                     <div
-                        className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden"
-                        style={{ height: "calc(100vh - 220px)" }}
+                        className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden flex-1 relative"
+                        style={{ minHeight: "500px" }}
                     >
                         {!modelText ? (
                             <div className="flex items-center justify-center h-full text-gray-400">
@@ -288,22 +327,113 @@ export default function Home() {
                                 </div>
                             </div>
                         ) : (
-                            <Canvas
-                                camera={{ position: [200, 200, 200], fov: 50 }}
-                            >
-                                <ambientLight intensity={0.6} />
-                                <directionalLight
-                                    position={[300, 500, 300]}
-                                    intensity={1}
-                                />
-                                <OrbitControls />
-                                <Scene
-                                    modelText={modelText}
-                                    currentStep={currentStep}
-                                />
-                            </Canvas>
+                            <>
+                                <Canvas
+                                    camera={{
+                                        position: [200, 200, 200],
+                                        fov: 50,
+                                        near: 0.1,
+                                        far: 100000,
+                                    }}
+                                >
+                                    <ambientLight intensity={0.6} />
+                                    <directionalLight
+                                        position={[300, 500, 300]}
+                                        intensity={1}
+                                    />
+                                    <OrbitControls
+                                        minDistance={10}
+                                        maxDistance={10000}
+                                    />
+                                    <Scene
+                                        modelText={modelText}
+                                        currentStep={currentStep}
+                                        showGhostParts={showGhostParts}
+                                        dimPreviousSteps={dimPreviousSteps}
+                                        previousStepsOpacity={
+                                            previousStepsOpacity
+                                        }
+                                        onLoadingChange={handleLoadingChange}
+                                    />
+                                </Canvas>
+
+                                {/* Loading Overlay */}
+                                {isLoadingModel && (
+                                    <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center z-10">
+                                        <div className="bg-gray-800 rounded-xl p-8 shadow-2xl max-w-md w-full mx-4 border border-gray-700">
+                                            <div className="flex items-center justify-center mb-4">
+                                                <svg
+                                                    className="animate-spin h-12 w-12 text-yellow-400"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <circle
+                                                        className="opacity-25"
+                                                        cx="12"
+                                                        cy="12"
+                                                        r="10"
+                                                        stroke="currentColor"
+                                                        strokeWidth="4"
+                                                    ></circle>
+                                                    <path
+                                                        className="opacity-75"
+                                                        fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                    ></path>
+                                                </svg>
+                                            </div>
+                                            <h3 className="text-xl font-bold text-center text-white mb-2">
+                                                Loading LEGO Model
+                                            </h3>
+                                            <p className="text-center text-gray-400 text-sm mb-4">
+                                                Loading parts library files...
+                                            </p>
+
+                                            {/* Progress bar */}
+                                            <div className="mb-3">
+                                                <div className="flex justify-between text-sm text-gray-400 mb-2">
+                                                    <span>Progress</span>
+                                                    <span>
+                                                        {loadingProgress.loaded}{" "}
+                                                        /{" "}
+                                                        {loadingProgress.total}{" "}
+                                                        files
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-yellow-400 transition-all duration-300"
+                                                        style={{
+                                                            width:
+                                                                loadingProgress.total >
+                                                                0
+                                                                    ? `${(loadingProgress.loaded / loadingProgress.total) * 100}%`
+                                                                    : "0%",
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="text-xs text-gray-500 text-center">
+                                                This may take a moment on first
+                                                load
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
+
+                    {/* Step Preview Strip - below the viewer */}
+                    {steps.length > 0 && (
+                        <StepPreview
+                            steps={steps}
+                            currentStep={currentStep}
+                            onStepClick={handleStepClick}
+                        />
+                    )}
                 </main>
             </div>
 

@@ -11,6 +11,7 @@ interface UseSceneLoaderResult {
     error: string | null;
     isLoading: boolean;
     missingParts: string[];
+    loadingProgress: { loaded: number; total: number };
 }
 
 export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
@@ -18,24 +19,36 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [missingParts, setMissingParts] = useState<string[]>([]);
+    const [loadingProgress, setLoadingProgress] = useState({
+        loaded: 0,
+        total: 0,
+    });
     const missingPartsRef = useRef<string[]>([]);
 
     useEffect(() => {
         if (!modelText) {
             setModel(null);
             setMissingParts([]);
+            setLoadingProgress({ loaded: 0, total: 0 });
             return;
         }
 
         setIsLoading(true);
         setError(null);
+        setLoadingProgress({ loaded: 0, total: 0 });
         missingPartsRef.current = [];
 
         // Create a loading manager to track what's being loaded
         const manager = new LoadingManager();
 
-        manager.onStart = (url: string) => {
-            console.log("Loading:", url);
+        manager.onStart = (url: string, loaded: number, total: number) => {
+            console.log("Loading:", url, `(${loaded}/${total})`);
+            setLoadingProgress({ loaded, total });
+        };
+
+        manager.onProgress = (url: string, loaded: number, total: number) => {
+            console.log("Progress:", url, `(${loaded}/${total})`);
+            setLoadingProgress({ loaded, total });
         };
 
         manager.onLoad = () => {
@@ -60,6 +73,10 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
         // Set the ConditionalLineMaterial class (required in Three.js r170+)
         // Must be the CLASS itself, not an instance
         loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
+
+        // Optimize loading: disable smooth normals for faster parsing
+        // Can be enabled later if higher quality is needed
+        loader.smoothNormals = false;
 
         console.log("Loading materials from LDConfig.ldr");
 
@@ -97,5 +114,5 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
             });
     }, [modelText]);
 
-    return { model, error, isLoading, missingParts };
+    return { model, error, isLoading, missingParts, loadingProgress };
 }
