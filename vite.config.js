@@ -25,11 +25,22 @@ function ldrawPlugin() {
                     const fileName = url.split("/").pop() || "";
 
                     // Define search paths in order of likelihood
+                    // LDrawLoader with setPartsLibraryPath("/") requests paths like /parts/xxx.dat
+                    // We need to resolve these to /ldraw/parts/xxx.dat
                     const searchPaths = [
                         url, // Try original path first
-                        `/ldraw/parts/${fileName}`,
-                        `/ldraw/p/${fileName}`,
-                        `/ldraw/models/${fileName}`,
+                        // Handle /parts/xxx.dat -> /ldraw/parts/xxx.dat
+                        url.startsWith("/parts/")
+                            ? `/ldraw${url}`
+                            : `/ldraw/parts/${fileName}`,
+                        // Handle /p/xxx.dat -> /ldraw/p/xxx.dat
+                        url.startsWith("/p/")
+                            ? `/ldraw${url}`
+                            : `/ldraw/p/${fileName}`,
+                        // Handle /models/xxx.dat -> /ldraw/models/xxx.dat
+                        url.startsWith("/models/")
+                            ? `/ldraw${url}`
+                            : `/ldraw/models/${fileName}`,
                         `/ldraw/${fileName}`,
                         `/ldraw/parts/s/${fileName}`,
                         `/ldraw/p/48/${fileName}`,

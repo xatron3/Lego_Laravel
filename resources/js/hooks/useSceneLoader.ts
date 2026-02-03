@@ -4,19 +4,13 @@ import { LDrawLoader } from "three/examples/jsm/loaders/LDrawLoader.js";
 // @ts-expect-error - LDrawConditionalLineMaterial types not available
 import { LDrawConditionalLineMaterial } from "three/examples/jsm/materials/LDrawConditionalLineMaterial.js";
 import { Group, LoadingManager } from "three";
+import { stripBOM } from "../utils/stripBOM";
 
 interface UseSceneLoaderResult {
     model: Group | null;
     error: string | null;
     isLoading: boolean;
     missingParts: string[];
-}
-
-/**
- * Helper function to strip UTF-8 BOM from text if present
- */
-function stripBOM(text: string): string {
-    return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
 export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
@@ -59,8 +53,9 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
         // Set the path for loading LDConfig.ldr - this is where the loader looks for config files
         loader.setPath("/ldraw/");
         // Set the parts library path - LDrawLoader will append parts/, p/, models/ to this path
-        // Our files are in /ldraw/parts/, /ldraw/p/, so we set it to /ldraw/
-        loader.setPartsLibraryPath("/ldraw/");
+        // Since our files are in /ldraw/parts/, /ldraw/p/, etc., we use "/" and let the
+        // Vite middleware resolve the files from their actual location in /ldraw/
+        loader.setPartsLibraryPath("/");
 
         // Set the ConditionalLineMaterial class (required in Three.js r170+)
         // Must be the CLASS itself, not an instance

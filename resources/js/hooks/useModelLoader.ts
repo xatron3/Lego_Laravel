@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { parseStudioFile, Step } from "../parser";
+import { stripBOM } from "../utils/stripBOM";
 
 export function useModelLoader() {
     const [steps, setSteps] = useState<Step[]>([]);
@@ -7,11 +8,13 @@ export function useModelLoader() {
 
     const loadFile = async (file: File) => {
         const text = await file.text();
-        const parsed = parseStudioFile(text);
+        // Strip BOM before parsing and storing to prevent encoding issues
+        const cleanText = stripBOM(text);
+        const parsed = parseStudioFile(cleanText);
         setSteps(parsed);
-        setModelText(text);
+        setModelText(cleanText);
 
-        return { steps: parsed, text };
+        return { steps: parsed, text: cleanText };
     };
 
     const reset = () => {
