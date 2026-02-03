@@ -16,16 +16,6 @@ export function parseStudioFile(text: string): Step[] {
     let currentStep: Step = { step: 1, parts: [] };
 
     for (const line of lines) {
-        if (line.startsWith("0 STEP")) {
-            if (currentStep.parts.length > 0) {
-                steps.push(currentStep);
-            }
-            currentStep = {
-                step: steps.length + 1,
-                parts: [],
-            };
-        }
-
         if (line.startsWith("1 ")) {
             const tokens = line.trim().split(/\s+/);
 
@@ -41,9 +31,19 @@ export function parseStudioFile(text: string): Step[] {
                 position: [x, y, z],
                 matrix,
             });
+        } else if (line.startsWith("0 STEP") || line.startsWith("0 ROTSTEP")) {
+            // Push current step and start new one
+            if (currentStep.parts.length > 0) {
+                steps.push(currentStep);
+                currentStep = {
+                    step: steps.length + 1,
+                    parts: [],
+                };
+            }
         }
     }
 
+    // Always push the final step if it has parts (even if no trailing STEP command)
     if (currentStep.parts.length > 0) {
         steps.push(currentStep);
     }

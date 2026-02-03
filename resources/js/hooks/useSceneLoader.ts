@@ -83,6 +83,12 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
         // Strip BOM from model text before parsing
         const cleanModelText = stripBOM(modelText);
 
+        // Convert ROTSTEP to STEP so LDrawLoader recognizes all step markers
+        const normalizedModelText = cleanModelText.replace(
+            /^0 ROTSTEP.*$/gm,
+            "0 STEP",
+        );
+
         // Preload materials and then parse the model text directly
         loader
             .preloadMaterials("LDConfig.ldr")
@@ -91,7 +97,7 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
                 // Use parse() instead of load() to handle text content directly
                 // This allows LDrawLoader to resolve sub-parts from /ldraw/ path
                 loader.parse(
-                    cleanModelText,
+                    normalizedModelText,
                     (group: Group) => {
                         console.log("Model parsed successfully");
                         // LDraw uses a different coordinate system - rotate to align with Three.js

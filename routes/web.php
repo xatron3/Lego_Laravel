@@ -3,6 +3,26 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Response;
+use App\Http\Controllers\Auth\GoogleController;
+
+/*
+|--------------------------------------------------------------------------
+| CSRF Cookie Route (Required for Sanctum SPA Auth)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/sanctum/csrf-cookie', function () {
+  return response()->json(['message' => 'CSRF cookie set']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Google OAuth Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('auth.google');
+Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('auth.google.callback');
 
 /**
  * Serve an LDraw file with BOM stripping and proper headers.
@@ -158,6 +178,27 @@ Route::get('/ldraw/{path}', function ($path) {
   abort(404, "LDraw file not found: {$fileName}");
 })->where('path', '.*\.(dat|ldr|mpd)$');
 
+/*
+|--------------------------------------------------------------------------
+| Inertia Page Routes
+|--------------------------------------------------------------------------
+*/
+
+// Homepage
+Route::get('/', function () {
+  return Inertia::render('Welcome');
+})->name('home');
+
+// Store - browse and purchase models
+Route::get('/store', function () {
+  return Inertia::render('Store');
+})->name('store');
+
+// Model detail page
+Route::get('/model/{id}', function ($id) {
+  return Inertia::render('ModelDetail', ['id' => $id]);
+})->where('id', '[0-9]+')->name('model.show');
+
 // Catch-all for root-level .dat/.ldr/.mpd files (e.g., /3001.dat)
 Route::get('/{file}', function ($file) {
   $fullPath = findLDrawFile($file);
@@ -167,12 +208,28 @@ Route::get('/{file}', function ($file) {
   abort(404, "LDraw file not found: {$file}");
 })->where('file', '[^\/]+\.(dat|ldr|mpd)$');
 
-Route::get('/', function () {
-  return Inertia::render('Home');
-});
+// Viewer - 3D model viewer
+Route::get('/viewer', function () {
+  return Inertia::render('Viewer');
+})->name('viewer');
+
+// Viewer with specific model
+Route::get('/viewer/{id}', function ($id) {
+  return Inertia::render('Viewer', ['modelId' => $id]);
+})->where('id', '[0-9]+')->name('viewer.model');
+
+// Dashboard - user profile and model management
+Route::get('/dashboard', function () {
+  return Inertia::render('Dashboard');
+})->name('dashboard');
+
+// Admin panel route
+Route::get('/admin', function () {
+  return Inertia::render('Admin');
+})->name('admin');
 
 // Catch-all route for SPA - allows client-side routing if needed
 // Excludes API routes, static files (.dat, .ldr, .mpd, etc.), and the ldraw folder
 Route::get('/{any}', function () {
-  return Inertia::render('Home');
-})->where('any', '^(?!api|ldraw)(?!.*\.(dat|ldr|mpd|js|css|png|jpg|svg|ico|woff2?|ttf)).*$');
+  return Inertia::render('Welcome');
+})->where('any', '^(?!api|ldraw|admin)(?!.*\.(dat|ldr|mpd|js|css|png|jpg|svg|ico|woff2?|ttf)).*$');

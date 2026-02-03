@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { Group, Object3D, Material } from "three";
+import {
+    Group,
+    Object3D,
+    Material,
+    EdgesGeometry,
+    LineSegments,
+    LineBasicMaterial,
+    BufferGeometry,
+    Mesh,
+} from "three";
 import { useSceneLoader } from "./hooks/useSceneLoader";
 
 export default function Scene({
@@ -8,6 +17,8 @@ export default function Scene({
     showGhostParts = false,
     dimPreviousSteps = true,
     previousStepsOpacity = 0.2,
+    showCurrentStepBorder = false,
+    currentStepBorderColor = "#facc15",
     onMissingParts,
     onLoadingChange,
 }: {
@@ -16,6 +27,8 @@ export default function Scene({
     showGhostParts?: boolean;
     dimPreviousSteps?: boolean;
     previousStepsOpacity?: number;
+    showCurrentStepBorder?: boolean;
+    currentStepBorderColor?: string;
     onMissingParts?: (parts: string[]) => void;
     onLoadingChange?: (
         isLoading: boolean,
@@ -26,6 +39,11 @@ export default function Scene({
         useSceneLoader(modelText);
     const [visibleModel, setVisibleModel] = useState<Group | null>(null);
     const materialsCloned = useState(false);
+
+    // Reset materials cloned state when model changes
+    useEffect(() => {
+        materialsCloned[1](false);
+    }, [model, materialsCloned]);
 
     // Report missing parts to parent
     useEffect(() => {
@@ -108,6 +126,25 @@ export default function Scene({
             );
         };
 
+        // Remove all existing border lines from previous renders
+        const bordersToRemove: LineSegments[] = [];
+        model.traverse((child: Object3D) => {
+            if (child.userData.isBorder) {
+                bordersToRemove.push(child as LineSegments);
+            }
+        });
+        bordersToRemove.forEach((border) => {
+            border.parent?.remove(border);
+            if (border.geometry) border.geometry.dispose();
+            if (border.material) {
+                if (Array.isArray(border.material)) {
+                    border.material.forEach((m) => m.dispose());
+                } else {
+                    border.material.dispose();
+                }
+            }
+        });
+
         model.traverse((child: Object3D) => {
             if (child.userData.buildingStep !== undefined) {
                 const partStep = child.userData.buildingStep;
@@ -122,6 +159,32 @@ export default function Scene({
                     // Current step: full opacity (100%)
                     child.visible = true;
                     targetOpacity = 1.0;
+
+                    // Add border if enabled
+                    if (showCurrentStepBorder && child instanceof Mesh) {
+                        const mesh = child as Mesh;
+                        if (mesh.geometry) {
+                            try {
+                                const edges = new EdgesGeometry(
+                                    mesh.geometry as BufferGeometry,
+                                    30,
+                                );
+                                const line = new LineSegments(
+                                    edges,
+                                    new LineBasicMaterial({
+                                        color: currentStepBorderColor,
+                                        linewidth: 3,
+                                        transparent: true,
+                                        opacity: 1.0,
+                                    }),
+                                );
+                                line.userData.isBorder = true;
+                                mesh.add(line);
+                            } catch (e) {
+                                // Silently fail if geometry doesn't support edges
+                            }
+                        }
+                    }
                 } else if (isPreviousStep) {
                     // Previous steps: use dimming if enabled, otherwise full opacity
                     child.visible = true;
@@ -150,6 +213,8 @@ export default function Scene({
         showGhostParts,
         dimPreviousSteps,
         previousStepsOpacity,
+        showCurrentStepBorder,
+        currentStepBorderColor,
         materialsCloned,
     ]);
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useModelLoader } from "../hooks/useModelLoader";
@@ -7,19 +8,33 @@ import StepPreview from "../components/StepPreview";
 import PartsList from "../components/PartsList";
 import Scene from "../Scene";
 import { api, LegoModelData } from "../api";
+import { useAuth } from "../contexts/AuthContext";
+import AuthModal from "../components/AuthModal";
+import UserMenu from "../components/UserMenu";
 
-export default function Home() {
+interface ViewerProps {
+    modelId?: string;
+}
+
+export default function Home({ modelId }: ViewerProps = {}) {
+    const { user, isAuthenticated } = useAuth();
     const { steps, modelText, loadFile, reset } = useModelLoader();
     const [currentStep, setCurrentStep] = useState(0);
     const [savedModels, setSavedModels] = useState<LegoModelData[]>([]);
     const [currentFileName, setCurrentFileName] = useState<string>("");
     const [isSaving, setIsSaving] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showAuthModal, setShowAuthModal] = useState(false);
     const [modelName, setModelName] = useState("");
     const [modelDescription, setModelDescription] = useState("");
+    const [modelIsPublic, setModelIsPublic] = useState(false);
+    const [modelPrice, setModelPrice] = useState<string>("");
     const [showGhostParts, setShowGhostParts] = useState(false);
     const [dimPreviousSteps, setDimPreviousSteps] = useState(true);
     const [previousStepsOpacity, setPreviousStepsOpacity] = useState(0.2);
+    const [showCurrentStepBorder, setShowCurrentStepBorder] = useState(false);
+    const [currentStepBorderColor, setCurrentStepBorderColor] =
+        useState("#facc15");
     const [isLoadingModel, setIsLoadingModel] = useState(false);
     const [loadingProgress, setLoadingProgress] = useState({
         loaded: 0,
@@ -30,6 +45,12 @@ export default function Home() {
         loadSavedModels();
     }, []);
 
+    useEffect(() => {
+        if (modelId) {
+            loadModelById(parseInt(modelId));
+        }
+    }, [modelId]);
+
     const loadSavedModels = async () => {
         try {
             const models = await api.getModels();
@@ -39,12 +60,29 @@ export default function Home() {
         }
     };
 
+    const loadModelById = async (id: number) => {
+        try {
+            const fullModel = await api.getModel(id);
+            const file = new File(
+                [fullModel.ldr_content],
+                fullModel.file_name || "model.ldr",
+                { type: "text/plain" },
+            );
+            setCurrentFileName(fullModel.file_name || "model.ldr");
+            await loadFile(file);
+            setCurrentStep(0);
+        } catch (error) {
+            console.error("Failed to load model:", error);
+            alert("Failed to load model");
+        }
+    };
+
     const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setCurrentStep(0); // Reset step BEFORE loading to ensure proper dimming
         setCurrentFileName(file.name);
         await loadFile(file);
-        setCurrentStep(0);
     };
 
     const handleSave = async () => {
@@ -62,11 +100,15 @@ export default function Home() {
                 file_name: currentFileName,
                 total_steps: steps.length,
                 total_parts: totalParts,
+                is_public: modelIsPublic,
+                price: modelPrice ? parseFloat(modelPrice) : null,
             });
             await loadSavedModels();
             setShowSaveModal(false);
             setModelName("");
             setModelDescription("");
+            setModelIsPublic(false);
+            setModelPrice("");
         } catch (error) {
             console.error("Failed to save model:", error);
             alert("Failed to save model");
@@ -115,29 +157,112 @@ export default function Home() {
         setLoadingProgress(progress);
     };
 
+    // Keyboard navigation for steps
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle keyboard shortcuts when not typing in an input/textarea
+            if (
+                e.target instanceof HTMLInputElement ||
+                e.target instanceof HTMLTextAreaElement
+            ) {
+                return;
+            }
+
+            if (steps.length === 0) return;
+
+            if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                e.preventDefault();
+                handlePrevious();
+            } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                e.preventDefault();
+                handleNext();
+            } else if (e.key === "Home") {
+                e.preventDefault();
+                setCurrentStep(0);
+            } else if (e.key === "End") {
+                e.preventDefault();
+                setCurrentStep(steps.length - 1);
+            } else if (e.key === "g" || e.key === "G") {
+                // Toggle ghost mode with 'g' key
+                setShowGhostParts((prev) => !prev);
+            } else if (e.key === "b" || e.key === "B") {
+                // Toggle border with 'b' key
+                setShowCurrentStepBorder((prev) => !prev);
+            } else if (e.key === "d" || e.key === "D") {
+                // Toggle dimming with 'd' key
+                setDimPreviousSteps((prev) => !prev);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [steps.length]);
+
     return (
         <div className="min-h-screen bg-gray-900 text-white">
-            <header className="bg-gray-800 shadow-lg border-b border-gray-700">
-                <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-yellow-400">
-                        LEGO LDraw Studio Viewer
-                    </h1>
-                    <span className="text-gray-400 text-sm">
-                        Laravel + React + Three.js
-                    </span>
+            {/* Header */}
+            <header className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between h-16">
+                        <Link href="/" className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
+                                <svg
+                                    className="w-6 h-6 text-white"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                </svg>
+                            </div>
+                            <span className="text-xl font-bold text-white">
+                                BrickVault
+                            </span>
+                        </Link>
+
+                        <nav className="hidden md:flex items-center gap-8">
+                            <Link
+                                href="/store"
+                                className="text-gray-300 hover:text-white transition-colors"
+                            >
+                                Store
+                            </Link>
+                            <Link
+                                href="/viewer"
+                                className="text-yellow-400 font-medium"
+                            >
+                                Viewer
+                            </Link>
+                        </nav>
+
+                        <div className="flex items-center gap-4">
+                            {isAuthenticated ? (
+                                <UserMenu />
+                            ) : (
+                                <button
+                                    onClick={() => setShowAuthModal(true)}
+                                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors"
+                                >
+                                    Sign In
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            <div className="container mx-auto px-4 py-6 flex gap-6">
+            <div className="container mx-auto px-4 py-6 flex gap-6 pt-20">
+                {/* pt-20 for fixed header */}
                 {/* Left Sidebar - Saved Models */}
-                <aside className="w-72 shrink-0 space-y-4">
+                <aside className="w-72 shrink-0 space-y-4 max-h-[calc(100vh-7rem)] overflow-y-auto">
                     <div className="bg-gray-800 rounded-xl p-4 shadow-lg">
                         <h2 className="text-lg font-semibold mb-4 text-yellow-400">
-                            Saved Models
+                            {isAuthenticated
+                                ? "Public Models"
+                                : "Available Models"}
                         </h2>
                         {savedModels.length === 0 ? (
                             <p className="text-gray-500 text-sm">
-                                No saved models yet
+                                No models available yet
                             </p>
                         ) : (
                             <ul className="space-y-2 max-h-64 overflow-y-auto">
@@ -206,6 +331,12 @@ export default function Home() {
                             }
                             previousStepsOpacity={previousStepsOpacity}
                             onOpacityChange={setPreviousStepsOpacity}
+                            showCurrentStepBorder={showCurrentStepBorder}
+                            onToggleCurrentStepBorder={() =>
+                                setShowCurrentStepBorder(!showCurrentStepBorder)
+                            }
+                            currentStepBorderColor={currentStepBorderColor}
+                            onBorderColorChange={setCurrentStepBorderColor}
                         />
                     )}
 
@@ -353,6 +484,12 @@ export default function Home() {
                                         previousStepsOpacity={
                                             previousStepsOpacity
                                         }
+                                        showCurrentStepBorder={
+                                            showCurrentStepBorder
+                                        }
+                                        currentStepBorderColor={
+                                            currentStepBorderColor
+                                        }
                                         onLoadingChange={handleLoadingChange}
                                     />
                                 </Canvas>
@@ -472,7 +609,64 @@ export default function Home() {
                                     rows={3}
                                 />
                             </div>
-                            <div className="text-sm text-gray-400">
+
+                            {/* Visibility Toggle */}
+                            <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                                <div>
+                                    <span className="text-sm font-medium text-gray-300">
+                                        Make Public
+                                    </span>
+                                    <p className="text-xs text-gray-500">
+                                        Others can view this model
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() =>
+                                        setModelIsPublic(!modelIsPublic)
+                                    }
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        modelIsPublic
+                                            ? "bg-green-500"
+                                            : "bg-gray-600"
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                            modelIsPublic
+                                                ? "translate-x-6"
+                                                : "translate-x-1"
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {/* Price Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Price (USD)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                        $
+                                    </span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={modelPrice}
+                                        onChange={(e) =>
+                                            setModelPrice(e.target.value)
+                                        }
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-7 pr-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                        placeholder="0.00 (Free)"
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Leave empty or 0 for free
+                                </p>
+                            </div>
+
+                            <div className="text-sm text-gray-400 p-3 bg-gray-700/30 rounded-lg">
                                 <p>Steps: {steps.length}</p>
                                 <p>
                                     Parts:{" "}
@@ -485,7 +679,11 @@ export default function Home() {
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button
-                                onClick={() => setShowSaveModal(false)}
+                                onClick={() => {
+                                    setShowSaveModal(false);
+                                    setModelIsPublic(false);
+                                    setModelPrice("");
+                                }}
                                 className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors"
                             >
                                 Cancel
@@ -501,6 +699,12 @@ export default function Home() {
                     </div>
                 </div>
             )}
+
+            {/* Auth Modal */}
+            <AuthModal
+                isOpen={showAuthModal}
+                onClose={() => setShowAuthModal(false)}
+            />
         </div>
     );
 }

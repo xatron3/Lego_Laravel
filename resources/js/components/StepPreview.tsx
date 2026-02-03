@@ -31,7 +31,7 @@ export default function StepPreview({
                 </svg>
                 Step Navigator
             </h3>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 flex-wrap">
                 {steps.map((step, index) => {
                     const isActive = index === currentStep;
                     const isCompleted = index < currentStep;

@@ -41,12 +41,43 @@ composer test
 
 ## Code Patterns
 
-### API Routes
+### API Routes & Model Binding
 
-Use Laravel resource controllers with `apiResource()` in `routes/api.php`:
+**IMPORTANT**: Do NOT use Laravel's implicit route model binding with `{modelName}` parameters. Use explicit `{id}` parameters instead.
+
+Route definitions in `routes/api.php` use simple ID parameters with manual model loading:
 
 ```php
-Route::apiResource('lego-models', LegoModelController::class);
+// ✅ Correct: explicit ID parameter
+Route::get('lego-models/{id}', [LegoModelController::class, 'show']);
+
+// ❌ Avoid: implicit model binding (unreliable in this project)
+Route::get('lego-models/{legoModel}', [LegoModelController::class, 'show']);
+```
+
+Controller methods manually load models using `findOrFail()`:
+
+```php
+public function show(Request $request, string $id): JsonResponse
+{
+    $legoModel = LegoModel::findOrFail($id);
+    // ... access control checks
+}
+```
+
+### Model Access Control
+
+The `LegoModel` implements two-tier access control:
+
+- `canBeAccessedBy(?User $user)` - Can user view model details? (Public models = yes)
+- `canAccessContent(?User $user)` - Can user access full LDR content? (Requires ownership/purchase for paid models)
+
+Controllers should check access and conditionally hide `ldr_content`:
+
+```php
+if (!$legoModel->canAccessContent($request->user())) {
+    $model->makeHidden('ldr_content');
+}
 ```
 
 ### Frontend API Calls
@@ -75,9 +106,18 @@ const models = await api.getModels();
 - PHPUnit for backend (`tests/Feature/`, `tests/Unit/`)
 - Run with `composer test` or `php artisan test`
 
+## Known Issues & Workarounds
+
+### Route Model Binding
+
+Laravel's implicit route model binding (e.g., `{legoModel}` parameter auto-resolving to model instance) is **unreliable** in this project. Custom `Route::bind()` configurations in `AppServiceProvider` are not executed consistently.
+
+**Solution**: Always use explicit `{id}` parameters and manually load models with `LegoModel::findOrFail($id)` in controllers.
+
 ## Key Files Reference
 
 - [app.tsx](resources/js/app.tsx) - Main React app with model management UI
-- [LegoModelController.php](app/Http/Controllers/Api/LegoModelController.php) - CRUD API
+- [LegoModelController.php](app/Http/Controllers/Api/LegoModelController.php) - CRUD API with manual model loading
+- [LegoModel.php](app/Models/LegoModel.php) - Model with `canBeAccessedBy()` and `canAccessContent()` methods
 - [useSceneLoader.ts](resources/js/hooks/useSceneLoader.ts) - Three.js LDraw loading
 - [parser.ts](resources/js/parser.ts) - LDraw file format step parser
