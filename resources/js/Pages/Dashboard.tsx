@@ -6,7 +6,7 @@ import Header from "../components/Header";
 import { api, LegoModelData } from "../api";
 import { useModelLoader } from "../hooks/useModelLoader";
 
-type TabType = "my-models" | "submit" | "settings";
+type TabType = "my-models" | "submit" | "settings" | "admin";
 type FilterType = "all" | "created" | "owned";
 
 export default function Dashboard() {
@@ -31,6 +31,34 @@ export default function Dashboard() {
     const [settingsName, setSettingsName] = useState(user?.name || "");
     const [settingsEmail, setSettingsEmail] = useState(user?.email || "");
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+    // Admin Rebrickable state
+    const [rebrickableStats, setRebrickableStats] = useState<
+        Record<string, number>
+    >({});
+    const [rebrickableTables, setRebrickableTables] = useState<
+        Record<
+            string,
+            { has_file: boolean; columns: string[]; primary_key: string | null }
+        >
+    >({});
+    const [selectedTable, setSelectedTable] = useState<string | null>(null);
+    const [tableRecords, setTableRecords] = useState<any[]>([]);
+    const [tableLoading, setTableLoading] = useState(false);
+    const [tablePagination, setTablePagination] = useState({
+        page: 1,
+        lastPage: 1,
+        total: 0,
+    });
+    const [tableSearch, setTableSearch] = useState("");
+    const [importingTable, setImportingTable] = useState<string | null>(null);
+    const [importingAll, setImportingAll] = useState(false);
+    const [importResults, setImportResults] = useState<{
+        results: Record<string, number>;
+        errors: Record<string, string>;
+    } | null>(null);
+
+    const isAdmin = user?.role === "admin";
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -144,6 +172,140 @@ export default function Dashboard() {
             setIsSavingSettings(false);
         }
     };
+
+    // Admin functions
+    const loadRebrickableData = async () => {
+        if (!isAdmin) return;
+        try {
+            const [stats, tables] = await Promise.all([
+                api.getRebrickableStats(),
+                api.getRebrickableTables(),
+            ]);
+            setRebrickableStats(stats);
+            setRebrickableTables(tables);
+        } catch (error) {
+            console.error("Failed to load Rebrickable data:", error);
+        }
+    };
+
+    const loadTableRecords = async (table: string, page = 1) => {
+        setTableLoading(true);
+        try {
+            const result = await api.getRebrickableRecords(table, {
+                search: tableSearch,
+                page,
+                per_page: 20,
+            });
+            setTableRecords(result.data);
+            setTablePagination({
+                page: result.current_page,
+                lastPage: result.last_page,
+                total: result.total,
+            });
+        } catch (error) {
+            console.error("Failed to load records:", error);
+        } finally {
+            setTableLoading(false);
+        }
+    };
+
+    const handleImportTable = async (table: string) => {
+        setImportingTable(table);
+        try {
+            const result = await api.importRebrickableTable(table);
+            alert(result.message);
+            loadRebrickableData();
+            if (selectedTable === table) {
+                loadTableRecords(table);
+            }
+        } catch (error: any) {
+            alert(error.message || "Import failed");
+        } finally {
+            setImportingTable(null);
+        }
+    };
+
+    const handleImportAll = async () => {
+        if (
+            !confirm(
+                "This will import all CSV files from the data folder. This may take a while. Continue?",
+            )
+        )
+            return;
+        setImportingAll(true);
+        setImportResults(null);
+        try {
+            const result = await api.importAllRebrickableTables();
+            setImportResults({
+                results: result.results,
+                errors: result.errors,
+            });
+            loadRebrickableData();
+        } catch (error: any) {
+            alert(error.message || "Import failed");
+        } finally {
+            setImportingAll(false);
+        }
+    };
+
+    const handleClearTable = async (table: string) => {
+        if (!confirm(`Are you sure you want to clear all data from ${table}?`))
+            return;
+        try {
+            await api.clearRebrickableTable(table);
+            loadRebrickableData();
+            if (selectedTable === table) {
+                loadTableRecords(table);
+            }
+        } catch (error: any) {
+            alert(error.message || "Clear failed");
+        }
+    };
+
+    const handleClearAll = async () => {
+        if (
+            !confirm(
+                "Are you sure you want to clear ALL Rebrickable data? This cannot be undone!",
+            )
+        )
+            return;
+        try {
+            await api.clearAllRebrickableTables();
+            loadRebrickableData();
+            setSelectedTable(null);
+            setTableRecords([]);
+        } catch (error: any) {
+            alert(error.message || "Clear failed");
+        }
+    };
+
+    const handleCsvFileUpload = async (table: string, file: File) => {
+        setImportingTable(table);
+        try {
+            const result = await api.uploadRebrickableCsv(table, file);
+            alert(result.message);
+            loadRebrickableData();
+            if (selectedTable === table) {
+                loadTableRecords(table);
+            }
+        } catch (error: any) {
+            alert(error.message || "Upload failed");
+        } finally {
+            setImportingTable(null);
+        }
+    };
+
+    useEffect(() => {
+        if (isAdmin && activeTab === "admin") {
+            loadRebrickableData();
+        }
+    }, [isAdmin, activeTab]);
+
+    useEffect(() => {
+        if (selectedTable) {
+            loadTableRecords(selectedTable);
+        }
+    }, [selectedTable, tableSearch]);
 
     if (!isAuthenticated) {
         return (
@@ -265,6 +427,33 @@ export default function Dashboard() {
                             </svg>
                             Settings
                         </button>
+
+                        {/* Admin Tab - Only visible to admins */}
+                        {isAdmin && (
+                            <button
+                                onClick={() => setActiveTab("admin")}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                                    activeTab === "admin"
+                                        ? "bg-red-500 text-white"
+                                        : "text-red-400 hover:bg-gray-700"
+                                }`}
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                                    />
+                                </svg>
+                                Data Import
+                            </button>
+                        )}
                     </nav>
                 </aside>
 
@@ -325,7 +514,7 @@ export default function Dashboard() {
                                             <div className="aspect-video bg-gray-700 relative">
                                                 {model.thumbnail ? (
                                                     <img
-                                                        src={model.thumbnail}
+                                                        src={`/storage/${model.thumbnail}`}
                                                         alt={model.name}
                                                         className="w-full h-full object-cover"
                                                     />
@@ -736,6 +925,396 @@ export default function Dashboard() {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Admin Tab */}
+                    {activeTab === "admin" && isAdmin && (
+                        <div>
+                            <h1 className="text-2xl font-bold text-white mb-6">
+                                Rebrickable Data Import
+                            </h1>
+
+                            {/* Import All Section */}
+                            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-white mb-2">
+                                            Bulk Import
+                                        </h2>
+                                        <p className="text-gray-400 text-sm">
+                                            Import all CSV files from the data
+                                            folder at once. Files should be
+                                            placed in{" "}
+                                            <code className="bg-gray-700 px-1 rounded">
+                                                data/
+                                            </code>{" "}
+                                            folder.
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={handleImportAll}
+                                            disabled={importingAll}
+                                            className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {importingAll ? (
+                                                <span className="flex items-center gap-2">
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                    Importing...
+                                                </span>
+                                            ) : (
+                                                "Import All"
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={handleClearAll}
+                                            className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Import Results */}
+                                {importResults && (
+                                    <div className="mt-4 p-4 bg-gray-700 rounded-lg">
+                                        <h3 className="text-white font-medium mb-2">
+                                            Import Results
+                                        </h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                            {Object.entries(
+                                                importResults.results,
+                                            ).map(([table, count]) => (
+                                                <div
+                                                    key={table}
+                                                    className="flex justify-between p-2 bg-gray-600 rounded"
+                                                >
+                                                    <span className="text-gray-300">
+                                                        {table}
+                                                    </span>
+                                                    <span className="text-green-400">
+                                                        {count.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {Object.keys(importResults.errors)
+                                            .length > 0 && (
+                                            <div className="mt-2">
+                                                <h4 className="text-red-400 font-medium mb-1">
+                                                    Errors
+                                                </h4>
+                                                {Object.entries(
+                                                    importResults.errors,
+                                                ).map(([table, error]) => (
+                                                    <div
+                                                        key={table}
+                                                        className="text-red-300 text-sm"
+                                                    >
+                                                        {table}: {error}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Table Stats */}
+                            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                                <h2 className="text-lg font-semibold text-white mb-4">
+                                    Database Statistics
+                                </h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                    {Object.entries(rebrickableStats).map(
+                                        ([table, count]) => (
+                                            <div
+                                                key={table}
+                                                className="bg-gray-700 rounded-lg p-4 text-center"
+                                            >
+                                                <div className="text-2xl font-bold text-yellow-400">
+                                                    {count.toLocaleString()}
+                                                </div>
+                                                <div className="text-gray-400 text-sm mt-1">
+                                                    {table.replace(/_/g, " ")}
+                                                </div>
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Individual Table Import */}
+                            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                                <h2 className="text-lg font-semibold text-white mb-4">
+                                    Individual Table Import
+                                </h2>
+                                <div className="space-y-3">
+                                    {Object.entries(rebrickableTables).map(
+                                        ([table, info]) => (
+                                            <div
+                                                key={table}
+                                                className="flex items-center justify-between p-4 bg-gray-700 rounded-lg"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div>
+                                                        <div className="text-white font-medium">
+                                                            {table}
+                                                        </div>
+                                                        <div className="text-gray-400 text-sm">
+                                                            {info.columns.join(
+                                                                ", ",
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {info.has_file ? (
+                                                        <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                                                            CSV available
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-1 bg-gray-600 text-gray-400 text-xs rounded">
+                                                            No CSV
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() =>
+                                                            setSelectedTable(
+                                                                selectedTable ===
+                                                                    table
+                                                                    ? null
+                                                                    : table,
+                                                            )
+                                                        }
+                                                        className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded-lg transition-colors"
+                                                    >
+                                                        {selectedTable === table
+                                                            ? "Hide"
+                                                            : "Browse"}
+                                                    </button>
+                                                    {info.has_file && (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleImportTable(
+                                                                    table,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                importingTable ===
+                                                                table
+                                                            }
+                                                            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+                                                        >
+                                                            {importingTable ===
+                                                            table
+                                                                ? "..."
+                                                                : "Import"}
+                                                        </button>
+                                                    )}
+                                                    <label className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors cursor-pointer">
+                                                        Upload
+                                                        <input
+                                                            type="file"
+                                                            accept=".csv"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                const file =
+                                                                    e.target
+                                                                        .files?.[0];
+                                                                if (file)
+                                                                    handleCsvFileUpload(
+                                                                        table,
+                                                                        file,
+                                                                    );
+                                                            }}
+                                                        />
+                                                    </label>
+                                                    <button
+                                                        onClick={() =>
+                                                            handleClearTable(
+                                                                table,
+                                                            )
+                                                        }
+                                                        className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-sm rounded-lg transition-colors"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Table Browser */}
+                            {selectedTable && (
+                                <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-lg font-semibold text-white">
+                                            {selectedTable} (
+                                            {tablePagination.total.toLocaleString()}{" "}
+                                            records)
+                                        </h2>
+                                        <div className="flex items-center gap-4">
+                                            <input
+                                                type="text"
+                                                value={tableSearch}
+                                                onChange={(e) =>
+                                                    setTableSearch(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Search..."
+                                                className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {tableLoading ? (
+                                        <div className="flex justify-center py-8">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400"></div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="border-b border-gray-700">
+                                                            {rebrickableTables[
+                                                                selectedTable
+                                                            ]?.columns.map(
+                                                                (col) => (
+                                                                    <th
+                                                                        key={
+                                                                            col
+                                                                        }
+                                                                        className="px-4 py-3 text-left text-gray-400 font-medium"
+                                                                    >
+                                                                        {col}
+                                                                    </th>
+                                                                ),
+                                                            )}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {tableRecords.map(
+                                                            (record, idx) => (
+                                                                <tr
+                                                                    key={idx}
+                                                                    className="border-b border-gray-700/50 hover:bg-gray-700/50"
+                                                                >
+                                                                    {rebrickableTables[
+                                                                        selectedTable
+                                                                    ]?.columns.map(
+                                                                        (
+                                                                            col,
+                                                                        ) => (
+                                                                            <td
+                                                                                key={
+                                                                                    col
+                                                                                }
+                                                                                className="px-4 py-3 text-gray-300"
+                                                                            >
+                                                                                {col ===
+                                                                                    "rgb" &&
+                                                                                record[
+                                                                                    col
+                                                                                ] ? (
+                                                                                    <span className="flex items-center gap-2">
+                                                                                        <span
+                                                                                            className="w-4 h-4 rounded border border-gray-600"
+                                                                                            style={{
+                                                                                                backgroundColor: `#${record[col]}`,
+                                                                                            }}
+                                                                                        ></span>
+                                                                                        {
+                                                                                            record[
+                                                                                                col
+                                                                                            ]
+                                                                                        }
+                                                                                    </span>
+                                                                                ) : typeof record[
+                                                                                      col
+                                                                                  ] ===
+                                                                                  "boolean" ? (
+                                                                                    record[
+                                                                                        col
+                                                                                    ] ? (
+                                                                                        "Yes"
+                                                                                    ) : (
+                                                                                        "No"
+                                                                                    )
+                                                                                ) : (
+                                                                                    String(
+                                                                                        record[
+                                                                                            col
+                                                                                        ] ??
+                                                                                            "",
+                                                                                    )
+                                                                                )}
+                                                                            </td>
+                                                                        ),
+                                                                    )}
+                                                                </tr>
+                                                            ),
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* Pagination */}
+                                            {tablePagination.lastPage > 1 && (
+                                                <div className="flex items-center justify-between mt-4">
+                                                    <div className="text-gray-400 text-sm">
+                                                        Page{" "}
+                                                        {tablePagination.page}{" "}
+                                                        of{" "}
+                                                        {
+                                                            tablePagination.lastPage
+                                                        }
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() =>
+                                                                loadTableRecords(
+                                                                    selectedTable,
+                                                                    tablePagination.page -
+                                                                        1,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                tablePagination.page <=
+                                                                1
+                                                            }
+                                                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            Previous
+                                                        </button>
+                                                        <button
+                                                            onClick={() =>
+                                                                loadTableRecords(
+                                                                    selectedTable,
+                                                                    tablePagination.page +
+                                                                        1,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                tablePagination.page >=
+                                                                tablePagination.lastPage
+                                                            }
+                                                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            Next
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </main>

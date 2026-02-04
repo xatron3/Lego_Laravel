@@ -5,7 +5,7 @@ import UserMenu from "./UserMenu";
 interface HeaderProps {
     onOpenAuthModal?: () => void;
     fixed?: boolean;
-    currentPage?: "home" | "store" | "viewer" | "dashboard";
+    currentPage?: "home" | "store" | "catalog" | "viewer" | "dashboard";
 }
 
 export default function Header({
@@ -49,6 +49,12 @@ export default function Header({
                         </Link>
                         <Link href="/store" className={navLinkClass("store")}>
                             Store
+                        </Link>
+                        <Link
+                            href="/catalog"
+                            className={navLinkClass("catalog")}
+                        >
+                            Catalog
                         </Link>
                         <Link href="/viewer" className={navLinkClass("viewer")}>
                             Viewer

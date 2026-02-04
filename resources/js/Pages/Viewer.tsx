@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "@inertiajs/react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useModelLoader } from "../hooks/useModelLoader";
@@ -11,13 +10,20 @@ import { api, LegoModelData } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
+import PartsListOverlay, { PartInStep } from "../components/PartsListOverlay";
+import { getPartsForStep } from "../parser";
+import {
+    captureCanvasScreenshot,
+    blobToBase64,
+    resizeImage,
+} from "../utils/screenshotCapture";
 
 interface ViewerProps {
     modelId?: string;
 }
 
 export default function Home({ modelId }: ViewerProps = {}) {
-    const { user, isAuthenticated } = useAuth();
+    const { isAuthenticated } = useAuth();
     const { steps, modelText, loadFile } = useModelLoader();
     const [currentStep, setCurrentStep] = useState(0);
     const [savedModels, setSavedModels] = useState<LegoModelData[]>([]);
@@ -34,6 +40,8 @@ export default function Home({ modelId }: ViewerProps = {}) {
         loaded: 0,
         total: 0,
     });
+    const [isSavingScreenshot, setIsSavingScreenshot] = useState(false);
+    const canvasContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadSavedModels();
@@ -95,6 +103,65 @@ export default function Home({ modelId }: ViewerProps = {}) {
         setLoadingProgress(progress);
     };
 
+    const handleSaveScreenshot = async () => {
+        if (!selectedModelId || !canvasContainerRef.current) {
+            alert("Please select a model first");
+            return;
+        }
+
+        try {
+            setIsSavingScreenshot(true);
+
+            // Find the canvas element
+            const canvas = canvasContainerRef.current.querySelector(
+                "canvas",
+            ) as HTMLCanvasElement;
+            if (!canvas) {
+                throw new Error("Canvas not found");
+            }
+
+            // Capture screenshot
+            const blob = await captureCanvasScreenshot(canvas, "png");
+
+            // Resize to reasonable thumbnail size
+            const resizedBlob = await resizeImage(blob, 800, 600);
+
+            // Convert to base64
+            const base64 = await blobToBase64(resizedBlob);
+
+            // Upload to server
+            await api.uploadThumbnail(parseInt(selectedModelId), base64);
+
+            alert("Screenshot saved successfully!");
+
+            // Reload models to show updated thumbnail
+            await loadSavedModels();
+        } catch (error) {
+            console.error("Failed to save screenshot:", error);
+            alert("Failed to save screenshot. Please try again.");
+        } finally {
+            setIsSavingScreenshot(false);
+        }
+    };
+
+    // Compute parts for current step with image URLs
+    const currentStepParts = useMemo<PartInStep[]>(() => {
+        if (steps.length === 0 || currentStep >= steps.length) {
+            return [];
+        }
+
+        const step = steps[currentStep];
+        const partCounts = getPartsForStep(step);
+
+        return partCounts.map((partCount) => ({
+            partId: partCount.partId,
+            colorId: partCount.colorId,
+            count: partCount.count,
+            imageUrl: `https://cdn.rebrickable.com/media/parts/ldraw/${partCount.colorId}/${partCount.partId}.png`,
+            photoUrl: `https://cdn.rebrickable.com/media/parts/elements/${partCount.partId}.jpg`,
+        }));
+    }, [steps, currentStep]);
+
     // Keyboard navigation for steps
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -146,7 +213,10 @@ export default function Home({ modelId }: ViewerProps = {}) {
             {/* Main Content - Full Screen Viewer */}
             <div className="pt-20 h-screen flex overflow-hidden">
                 {/* 3D Viewer - Main Window */}
-                <div className="flex-1 bg-gray-800 relative overflow-hidden">
+                <div
+                    ref={canvasContainerRef}
+                    className="flex-1 bg-gray-800 relative overflow-hidden"
+                >
                     {!modelText ? (
                         <div className="flex items-center justify-center h-full text-gray-400">
                             <div className="text-center">
@@ -173,7 +243,78 @@ export default function Home({ modelId }: ViewerProps = {}) {
                         </div>
                     ) : (
                         <>
+                            {/* Screenshot Button */}
+                            {selectedModelId && isAuthenticated && (
+                                <div className="absolute top-4 right-4 z-10">
+                                    <button
+                                        onClick={handleSaveScreenshot}
+                                        disabled={isSavingScreenshot}
+                                        className="bg-gray-900/80 hover:bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg border border-gray-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Save Screenshot as Thumbnail"
+                                    >
+                                        {isSavingScreenshot ? (
+                                            <>
+                                                <svg
+                                                    className="animate-spin h-5 w-5"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <circle
+                                                        className="opacity-25"
+                                                        cx="12"
+                                                        cy="12"
+                                                        r="10"
+                                                        stroke="currentColor"
+                                                        strokeWidth="4"
+                                                    ></circle>
+                                                    <path
+                                                        className="opacity-75"
+                                                        fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                    ></path>
+                                                </svg>
+                                                <span>Saving...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg
+                                                    className="w-5 h-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                                    />
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                                    />
+                                                </svg>
+                                                <span>Screenshot</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Parts List Overlay */}
+                            {currentStepParts.length > 0 && (
+                                <PartsListOverlay
+                                    parts={currentStepParts}
+                                    stepNumber={currentStep + 1}
+                                    totalSteps={steps.length}
+                                />
+                            )}
+
                             <Canvas
+                                gl={{ preserveDrawingBuffer: true }}
                                 camera={{
                                     position: [200, 200, 200],
                                     fov: 50,
@@ -273,7 +414,7 @@ export default function Home({ modelId }: ViewerProps = {}) {
                 <aside className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col overflow-hidden overflow-y-auto ">
                     {/* Model Selector */}
                     {savedModels.length > 0 && (
-                        <div className="p-4 border-b border-gray-700 flex-shrink-0">
+                        <div className="p-4 border-b border-gray-700 shrink-0">
                             <label className="text-xs font-semibold text-gray-400 mb-2 block">
                                 SELECT MODEL
                             </label>
@@ -294,7 +435,7 @@ export default function Home({ modelId }: ViewerProps = {}) {
 
                     {/* Step Controls */}
                     {steps.length > 0 && (
-                        <div className="p-4 border-b border-gray-700 flex-shrink-0">
+                        <div className="p-4 border-b border-gray-700 shrink-0">
                             <StepControls
                                 currentStep={currentStep}
                                 totalSteps={steps.length}

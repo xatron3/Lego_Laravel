@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { Link, router } from "@inertiajs/react";
+import { useEffect, useState } from "react";
+import { router } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import Scene from "../Scene";
-import { api, LegoModelData } from "../api";
+import { api, LegoModelData, InventoryPartData } from "../api";
 
 interface ModelDetailProps {
     id: string;
@@ -21,7 +21,6 @@ export default function ModelDetail({ id }: ModelDetailProps) {
     const [isRemoving, setIsRemoving] = useState(false);
     const [alreadyOwned, setAlreadyOwned] = useState(false);
     const [ownershipType, setOwnershipType] = useState<string | null>(null);
-    const [currentStep, setCurrentStep] = useState(0);
     const [loadError, setLoadError] = useState(false);
     const [loadingProgress, setLoadingProgress] = useState({
         loaded: 0,
@@ -111,305 +110,317 @@ export default function ModelDetail({ id }: ModelDetailProps) {
             <Header currentPage="store" />
 
             {/* Main Content */}
-            <main className="pt-20 pb-12">
+            <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 {isLoading ? (
-                    <div className="flex justify-center items-center min-h-[60vh]">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
-                    </div>
+                    <LoadingState />
                 ) : loadError || !model ? (
-                    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-                        <svg
-                            className="w-16 h-16 text-gray-600 mb-4"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                        </svg>
-                        <h2 className="text-2xl font-bold text-white mb-2">
-                            Model Not Found
-                        </h2>
-                        <p className="text-gray-400 mb-6">
-                            The model you're looking for doesn't exist or has
-                            been removed.
-                        </p>
-                        <Link
-                            href="/store"
-                            className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors"
-                        >
-                            Back to Store
-                        </Link>
-                    </div>
+                    <ErrorState />
                 ) : (
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        {/* Breadcrumb */}
-                        <div className="py-4">
-                            <nav className="flex items-center gap-2 text-sm text-gray-400">
-                                <Link
-                                    href="/store"
-                                    className="hover:text-white transition-colors"
-                                >
-                                    Store
-                                </Link>
-                                <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9 5l7 7-7 7"
-                                    />
-                                </svg>
-                                <span className="text-white">{model.name}</span>
-                            </nav>
-                        </div>
+                    <>
+                        {/* Back Button */}
+                        <button
+                            onClick={() => router.visit("/store")}
+                            className="mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+                        >
+                            <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15 19l-7-7 7-7"
+                                />
+                            </svg>
+                            Back to Store
+                        </button>
 
-                        <div className="grid lg:grid-cols-2 gap-8">
-                            {/* 3D Preview */}
-                            <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
-                                <div className="aspect-square relative">
-                                    {model.ldr_content ? (
-                                        <Canvas
-                                            camera={{
-                                                position: [100, 100, 100],
-                                                fov: 50,
-                                            }}
-                                        >
-                                            <ambientLight intensity={0.6} />
-                                            <directionalLight
-                                                position={[10, 10, 5]}
-                                                intensity={1}
-                                            />
-                                            <Scene
-                                                modelText={model.ldr_content}
-                                                currentStep={currentStep}
-                                                showGhostParts={false}
-                                                dimPreviousSteps={false}
-                                                previousStepsOpacity={1}
-                                                showCurrentStepBorder={false}
-                                                currentStepBorderColor="#facc15"
-                                                onLoadingChange={(
-                                                    _,
-                                                    progress,
-                                                ) =>
-                                                    setLoadingProgress(progress)
-                                                }
-                                            />
-                                            <OrbitControls
-                                                enablePan
-                                                enableZoom
-                                                enableRotate
-                                            />
-                                        </Canvas>
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                                            <svg
-                                                className="w-24 h-24 text-gray-600"
-                                                fill="currentColor"
-                                                viewBox="0 0 24 24"
+                        {/* Header Section */}
+                        <div className="bg-gray-800 rounded-2xl p-6 mb-6">
+                            <div className="flex flex-col lg:flex-row gap-8">
+                                {/* 3D Preview */}
+                                <div className="lg:w-1/2">
+                                    <div className="aspect-square bg-gray-700 rounded-xl overflow-hidden relative">
+                                        {model.ldr_content ? (
+                                            <Canvas
+                                                gl={{
+                                                    preserveDrawingBuffer: true,
+                                                }}
+                                                camera={{
+                                                    position: [100, 100, 100],
+                                                    fov: 50,
+                                                }}
                                             >
-                                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                            </svg>
-                                        </div>
-                                    )}
-                                </div>
-                                {loadingProgress.total > 0 &&
-                                    loadingProgress.loaded <
-                                        loadingProgress.total && (
-                                        <div className="px-4 py-2 bg-gray-700">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-yellow-400 transition-all duration-300"
-                                                        style={{
-                                                            width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%`,
-                                                        }}
-                                                    />
-                                                </div>
-                                                <span className="text-xs text-gray-400">
-                                                    {Math.round(
-                                                        (loadingProgress.loaded /
-                                                            loadingProgress.total) *
-                                                            100,
-                                                    )}
-                                                    %
+                                                <ambientLight intensity={0.6} />
+                                                <directionalLight
+                                                    position={[10, 10, 5]}
+                                                    intensity={1}
+                                                />
+                                                <Scene
+                                                    modelText={
+                                                        model.ldr_content
+                                                    }
+                                                    currentStep={0}
+                                                    showGhostParts={false}
+                                                    dimPreviousSteps={false}
+                                                    previousStepsOpacity={1}
+                                                    showCurrentStepBorder={
+                                                        false
+                                                    }
+                                                    currentStepBorderColor="#facc15"
+                                                    onLoadingChange={(
+                                                        _,
+                                                        progress,
+                                                    ) =>
+                                                        setLoadingProgress(
+                                                            progress,
+                                                        )
+                                                    }
+                                                />
+                                                <OrbitControls
+                                                    enablePan
+                                                    enableZoom
+                                                    enableRotate
+                                                />
+                                            </Canvas>
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                                <span className="text-8xl">
+                                                    🏗️
                                                 </span>
                                             </div>
-                                        </div>
-                                    )}
-                            </div>
-
-                            {/* Model Info */}
-                            <div>
-                                <div className="mb-4">
-                                    {isFree ? (
-                                        <span className="px-3 py-1 bg-green-500 text-white text-sm font-bold rounded-full">
-                                            FREE
-                                        </span>
-                                    ) : (
-                                        <span className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 text-sm font-bold rounded-full">
-                                            ${(model.price ?? 0).toFixed(2)}
-                                        </span>
-                                    )}
-                                </div>
-
-                                <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                                    {model.name}
-                                </h1>
-
-                                {model.description && (
-                                    <p className="text-gray-400 text-lg mb-6">
-                                        {model.description}
-                                    </p>
-                                )}
-
-                                <div className="flex items-center gap-4 mb-6 text-gray-400">
-                                    <span className="flex items-center gap-2">
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                        </svg>
-                                        {model.total_parts} parts
-                                    </span>
-                                    <span className="flex items-center gap-2">
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                            />
-                                        </svg>
-                                        {model.total_steps} steps
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center gap-3 mb-8 p-4 bg-gray-800 rounded-lg border border-gray-700">
-                                    <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                                        <span className="text-lg font-bold text-yellow-400">
-                                            {model.user?.name
-                                                ?.charAt(0)
-                                                .toUpperCase() || "?"}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <div className="text-white font-medium">
-                                            {model.user?.name || "Anonymous"}
-                                        </div>
-                                        <div className="text-gray-500 text-sm">
-                                            Creator
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="space-y-3">
-                                    {isOwner ? (
-                                        <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-                                            <p className="text-gray-400 text-center">
-                                                This is your model
-                                            </p>
-                                        </div>
-                                    ) : alreadyOwned ? (
-                                        <>
-                                            <button
-                                                onClick={handleViewInViewer}
-                                                className="w-full px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all"
-                                            >
-                                                Open in Viewer
-                                            </button>
-                                            <p className="text-green-400 text-center text-sm">
-                                                ✓ In your library
-                                            </p>
-                                            {ownershipType === "claimed" &&
-                                                isFree && (
-                                                    <button
-                                                        onClick={
-                                                            handleRemoveFromLibrary
-                                                        }
-                                                        disabled={isRemoving}
-                                                        className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-red-400 font-medium rounded-lg transition-colors disabled:opacity-50 border border-gray-600"
-                                                    >
-                                                        {isRemoving ? (
-                                                            <span className="flex items-center justify-center gap-2">
-                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                                                                Removing...
-                                                            </span>
-                                                        ) : (
-                                                            "Remove from Library"
-                                                        )}
-                                                    </button>
-                                                )}
-                                        </>
-                                    ) : (
-                                        <button
-                                            onClick={handleAddToLibrary}
-                                            disabled={isAddingToLibrary}
-                                            className="w-full px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all disabled:opacity-50"
-                                        >
-                                            {isAddingToLibrary ? (
-                                                <span className="flex items-center justify-center gap-2">
-                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-                                                    Adding...
-                                                </span>
-                                            ) : isFree ? (
-                                                "Add to Library (Free)"
-                                            ) : (
-                                                `Purchase for $${(model.price ?? 0).toFixed(2)}`
+                                        )}
+                                        {loadingProgress.total > 0 &&
+                                            loadingProgress.loaded <
+                                                loadingProgress.total && (
+                                                <div className="absolute bottom-4 left-4 right-4 bg-gray-900/90 backdrop-blur-sm rounded-lg p-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-yellow-400 transition-all duration-300"
+                                                                style={{
+                                                                    width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            {Math.round(
+                                                                (loadingProgress.loaded /
+                                                                    loadingProgress.total) *
+                                                                    100,
+                                                            )}
+                                                            %
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             )}
-                                        </button>
-                                    )}
-
-                                    <button
-                                        onClick={handleViewInViewer}
-                                        className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors border border-gray-600"
-                                    >
-                                        Preview in Viewer
-                                    </button>
+                                    </div>
                                 </div>
 
-                                {/* Model Details */}
-                                <div className="mt-8 pt-8 border-t border-gray-700">
-                                    <h3 className="text-lg font-semibold text-white mb-4">
-                                        Details
-                                    </h3>
-                                    <dl className="space-y-3">
-                                        <div className="flex justify-between">
-                                            <dt className="text-gray-400">
-                                                File Name
-                                            </dt>
-                                            <dd className="text-white">
-                                                {model.file_name || "Unknown"}
-                                            </dd>
+                                {/* Info */}
+                                <div className="lg:w-1/2">
+                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                        <div>
+                                            <div className="mb-2">
+                                                {isFree ? (
+                                                    <span className="px-3 py-1 bg-green-500 text-white text-sm font-bold rounded-full">
+                                                        FREE
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-3 py-1 bg-linear-to-r from-yellow-400 to-orange-500 text-gray-900 text-sm font-bold rounded-full">
+                                                        $
+                                                        {(
+                                                            model.price ?? 0
+                                                        ).toFixed(2)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h1 className="text-3xl font-bold text-white">
+                                                {model.name}
+                                            </h1>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <dt className="text-gray-400">
-                                                Created
-                                            </dt>
-                                            <dd className="text-white">
-                                                {model.created_at
+                                    </div>
+
+                                    {model.description && (
+                                        <p className="text-gray-400 mb-6">
+                                            {model.description}
+                                        </p>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <StatCard
+                                            label="Total Parts"
+                                            value={model.total_parts.toLocaleString()}
+                                            icon="🧱"
+                                        />
+                                        <StatCard
+                                            label="Build Steps"
+                                            value={model.total_steps.toString()}
+                                            icon="📋"
+                                        />
+                                        <StatCard
+                                            label="File Name"
+                                            value={model.file_name || "Unknown"}
+                                            icon="📄"
+                                        />
+                                        <StatCard
+                                            label="Created"
+                                            value={
+                                                model.created_at
                                                     ? new Date(
                                                           model.created_at,
-                                                      ).toLocaleDateString()
-                                                    : "Unknown"}
-                                            </dd>
+                                                      ).toLocaleDateString(
+                                                          "en-US",
+                                                          {
+                                                              month: "short",
+                                                              day: "numeric",
+                                                              year: "numeric",
+                                                          },
+                                                      )
+                                                    : "Unknown"
+                                            }
+                                            icon="📅"
+                                        />
+                                    </div>
+
+                                    {/* Creator Info */}
+                                    <div className="flex items-center gap-3 p-4 bg-gray-700 rounded-lg mb-6">
+                                        <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+                                            <span className="text-lg font-bold text-yellow-400">
+                                                {model.user?.name
+                                                    ?.charAt(0)
+                                                    .toUpperCase() || "?"}
+                                            </span>
                                         </div>
-                                    </dl>
+                                        <div>
+                                            <div className="text-white font-medium">
+                                                {model.user?.name ||
+                                                    "Anonymous"}
+                                            </div>
+                                            <div className="text-gray-400 text-sm">
+                                                Creator
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="space-y-3">
+                                        {isOwner ? (
+                                            <div className="p-4 bg-gray-700 rounded-lg border border-gray-600 text-center">
+                                                <p className="text-gray-300">
+                                                    ✓ This is your model
+                                                </p>
+                                            </div>
+                                        ) : alreadyOwned ? (
+                                            <>
+                                                <button
+                                                    onClick={handleViewInViewer}
+                                                    className="w-full px-6 py-4 bg-linear-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all"
+                                                >
+                                                    Open in Viewer
+                                                </button>
+                                                <p className="text-green-400 text-center text-sm">
+                                                    ✓ In your library
+                                                </p>
+                                                {ownershipType === "claimed" &&
+                                                    isFree && (
+                                                        <button
+                                                            onClick={
+                                                                handleRemoveFromLibrary
+                                                            }
+                                                            disabled={
+                                                                isRemoving
+                                                            }
+                                                            className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-red-400 font-medium rounded-lg transition-colors disabled:opacity-50 border border-gray-600"
+                                                        >
+                                                            {isRemoving ? (
+                                                                <span className="flex items-center justify-center gap-2">
+                                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                                                    Removing...
+                                                                </span>
+                                                            ) : (
+                                                                "Remove from Library"
+                                                            )}
+                                                        </button>
+                                                    )}
+                                            </>
+                                        ) : (
+                                            <button
+                                                onClick={handleAddToLibrary}
+                                                disabled={isAddingToLibrary}
+                                                className="w-full px-6 py-4 bg-linear-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all disabled:opacity-50"
+                                            >
+                                                {isAddingToLibrary ? (
+                                                    <span className="flex items-center justify-center gap-2">
+                                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+                                                        Adding...
+                                                    </span>
+                                                ) : isFree ? (
+                                                    "Add to Library (Free)"
+                                                ) : (
+                                                    `Purchase for $${(model.price ?? 0).toFixed(2)}`
+                                                )}
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={handleViewInViewer}
+                                            className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors border border-gray-600"
+                                        >
+                                            Preview in Viewer
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+
+                        {/* Parts List Section */}
+                        {model.parts && model.parts.length > 0 && (
+                            <div className="bg-gray-800 rounded-2xl p-6">
+                                <h2 className="text-xl font-bold text-white mb-4">
+                                    Parts List ({model.parts_count})
+                                </h2>
+                                <div className="bg-gray-700 rounded-xl overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead className="bg-gray-600">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-gray-300 font-medium">
+                                                        Part
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left text-gray-300 font-medium">
+                                                        Color
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left text-gray-300 font-medium">
+                                                        Category
+                                                    </th>
+                                                    <th className="px-4 py-3 text-center text-gray-300 font-medium">
+                                                        Qty
+                                                    </th>
+                                                    <th className="px-4 py-3 text-center text-gray-300 font-medium">
+                                                        Buy
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-600">
+                                                {model.parts.map(
+                                                    (part, idx) => (
+                                                        <PartRow
+                                                            key={idx}
+                                                            part={part}
+                                                        />
+                                                    ),
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </main>
 
@@ -418,6 +429,139 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                 isOpen={showAuthModal}
                 onClose={() => setShowAuthModal(false)}
             />
+        </div>
+    );
+}
+
+// ==================== Parts List Component ====================
+
+function PartRow({ part }: { part: InventoryPartData }) {
+    const [imgError, setImgError] = useState(false);
+    const [photoError, setPhotoError] = useState(false);
+
+    // Determine which image to show
+    const imageUrl = !imgError
+        ? part.image_url
+        : !photoError && part.photo_url
+          ? part.photo_url
+          : null;
+
+    return (
+        <tr className="hover:bg-gray-650">
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gray-600 rounded-lg overflow-hidden shrink-0">
+                        {imageUrl ? (
+                            <img
+                                src={imageUrl}
+                                alt={part.name}
+                                className="w-full h-full object-contain"
+                                onError={() => {
+                                    if (!imgError) {
+                                        setImgError(true);
+                                    } else {
+                                        setPhotoError(true);
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                🧱
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <div className="text-white">{part.name}</div>
+                        <div className="text-yellow-400 text-sm font-mono">
+                            {part.part_num}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                    <div
+                        className="w-5 h-5 rounded border border-gray-500"
+                        style={{ backgroundColor: `#${part.color_rgb}` }}
+                    />
+                    <span className="text-gray-300">{part.color_name}</span>
+                </div>
+            </td>
+            <td className="px-4 py-3 text-gray-300">{part.category}</td>
+            <td className="px-4 py-3 text-center">
+                <span className="bg-gray-600 px-2 py-1 rounded text-white font-medium">
+                    {part.quantity}×
+                </span>
+                {part.is_spare && (
+                    <span className="ml-2 text-xs text-gray-400">(spare)</span>
+                )}
+            </td>
+            <td className="px-4 py-3 text-center">
+                <a
+                    href={part.bricklink_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 text-sm"
+                >
+                    BrickLink
+                </a>
+            </td>
+        </tr>
+    );
+}
+
+// ==================== Shared Components ====================
+
+function StatCard({
+    label,
+    value,
+    icon,
+}: {
+    label: string;
+    value: string;
+    icon: string;
+}) {
+    return (
+        <div className="bg-gray-700 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                <span>{icon}</span>
+                <span>{label}</span>
+            </div>
+            <div
+                className="text-white text-lg font-bold truncate"
+                title={value}
+            >
+                {value}
+            </div>
+        </div>
+    );
+}
+
+function LoadingState() {
+    return (
+        <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-yellow-400 border-t-transparent mb-4"></div>
+            <p className="text-gray-400">Loading model...</p>
+        </div>
+    );
+}
+
+function ErrorState() {
+    return (
+        <div className="flex flex-col items-center justify-center py-16">
+            <div className="text-6xl mb-4">😕</div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+                Model Not Found
+            </h2>
+            <p className="text-gray-400 mb-6">
+                The model you're looking for doesn't exist or has been removed.
+            </p>
+            <button
+                onClick={() => router.visit("/store")}
+                className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors"
+            >
+                Back to Store
+            </button>
         </div>
     );
 }

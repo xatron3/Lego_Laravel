@@ -194,6 +194,36 @@ Route::get('/store', function () {
   return Inertia::render('Store');
 })->name('store');
 
+// Catalog - browse LEGO parts, sets, and minifigs from Rebrickable database
+Route::get('/catalog', function () {
+  return Inertia::render('Catalog');
+})->name('catalog');
+
+// Catalog detail pages
+Route::get('/catalog/set/{id}', function ($id) {
+  return Inertia::render('CatalogDetail', ['type' => 'set', 'id' => $id]);
+})->name('catalog.set');
+
+Route::get('/catalog/part/{id}', function ($id) {
+  return Inertia::render('CatalogDetail', ['type' => 'part', 'id' => $id]);
+})->name('catalog.part');
+
+Route::get('/catalog/minifig/{id}', function ($id) {
+  return Inertia::render('CatalogDetail', ['type' => 'minifig', 'id' => $id]);
+})->name('catalog.minifig');
+
+Route::get('/catalog/color/{id}', function ($id) {
+  return Inertia::render('CatalogDetail', ['type' => 'color', 'id' => (string) $id]);
+})->where('id', '[0-9]+')->name('catalog.color');
+
+Route::get('/catalog/theme/{id}', function ($id) {
+  return Inertia::render('CatalogDetail', ['type' => 'theme', 'id' => (string) $id]);
+})->where('id', '[0-9]+')->name('catalog.theme');
+
+Route::get('/catalog/category/{id}', function ($id) {
+  return Inertia::render('CatalogDetail', ['type' => 'category', 'id' => (string) $id]);
+})->where('id', '[0-9]+')->name('catalog.category');
+
 // Model detail page
 Route::get('/model/{id}', function ($id) {
   return Inertia::render('ModelDetail', ['id' => $id]);

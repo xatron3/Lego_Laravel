@@ -1,5 +1,6 @@
 export type PartInstance = {
     partId: string;
+    colorId: number;
     position: [number, number, number];
     matrix: number[];
 };
@@ -7,6 +8,12 @@ export type PartInstance = {
 export type Step = {
     step: number;
     parts: PartInstance[];
+};
+
+export type PartCount = {
+    partId: string;
+    colorId: number;
+    count: number;
 };
 
 export function parseStudioFile(text: string): Step[] {
@@ -19,6 +26,7 @@ export function parseStudioFile(text: string): Step[] {
         if (line.startsWith("1 ")) {
             const tokens = line.trim().split(/\s+/);
 
+            const colorId = parseInt(tokens[1]);
             const x = parseFloat(tokens[2]);
             const y = parseFloat(tokens[3]);
             const z = parseFloat(tokens[4]);
@@ -28,6 +36,7 @@ export function parseStudioFile(text: string): Step[] {
 
             currentStep.parts.push({
                 partId: partFile.replace(".dat", ""),
+                colorId: colorId === 0 ? 1 : colorId, // Map color 0 to 1 (White)
                 position: [x, y, z],
                 matrix,
             });
@@ -49,4 +58,28 @@ export function parseStudioFile(text: string): Step[] {
     }
 
     return steps;
+}
+
+/**
+ * Aggregate parts for a specific step into counts
+ */
+export function getPartsForStep(step: Step): PartCount[] {
+    const partMap = new Map<string, PartCount>();
+
+    for (const part of step.parts) {
+        const key = `${part.partId}_${part.colorId}`;
+        const existing = partMap.get(key);
+
+        if (existing) {
+            existing.count++;
+        } else {
+            partMap.set(key, {
+                partId: part.partId,
+                colorId: part.colorId,
+                count: 1,
+            });
+        }
+    }
+
+    return Array.from(partMap.values());
 }

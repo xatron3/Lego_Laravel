@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\LegoModelController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\StoreController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\RebrickableController;
+use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\MocSetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +35,31 @@ Route::get('store', [StoreController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
+| Public Catalog Routes (Rebrickable Data)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('catalog')->group(function () {
+  Route::get('/stats', [CatalogController::class, 'stats']);
+  Route::get('/sets', [CatalogController::class, 'sets']);
+  Route::get('/sets/{setNum}', [CatalogController::class, 'showSet']);
+  Route::get('/mocs', [CatalogController::class, 'mocs']);
+  Route::get('/mocs/{setNum}', [CatalogController::class, 'showMoc']);
+  Route::get('/parts', [CatalogController::class, 'parts']);
+  Route::get('/parts/{partNum}', [CatalogController::class, 'showPart']);
+  Route::get('/minifigs', [CatalogController::class, 'minifigs']);
+  Route::get('/minifigs/{figNum}', [CatalogController::class, 'showMinifig']);
+  Route::get('/colors', [CatalogController::class, 'colors']);
+  Route::get('/colors/{colorId}', [CatalogController::class, 'showColor']);
+  Route::get('/themes', [CatalogController::class, 'themes']);
+  Route::get('/themes/{themeId}', [CatalogController::class, 'showTheme']);
+  Route::get('/categories', [CatalogController::class, 'categories']);
+  Route::get('/categories/{categoryId}', [CatalogController::class, 'showCategory']);
+  Route::get('/year-range', [CatalogController::class, 'yearRange']);
+});
+
+/*
+|--------------------------------------------------------------------------
 | LEGO Models API Routes
 |--------------------------------------------------------------------------
 */
@@ -53,6 +81,14 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('lego-models/{id}/claim', [LegoModelController::class, 'claim']);
   Route::delete('lego-models/{id}/claim', [LegoModelController::class, 'unclaim']);
 
+  // Model thumbnail
+  Route::post('lego-models/{id}/thumbnail', [LegoModelController::class, 'uploadThumbnail']);
+
+  // MOC management routes
+  Route::post('mocs', [MocSetController::class, 'store']);
+  Route::put('mocs/{setNum}', [MocSetController::class, 'update']);
+  Route::delete('mocs/{setNum}', [MocSetController::class, 'destroy']);
+
   // Dashboard routes
   Route::get('dashboard/models', [DashboardController::class, 'models']);
   Route::put('user/settings', [DashboardController::class, 'updateSettings']);
@@ -72,6 +108,22 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
   Route::get('/models', [AdminController::class, 'models']);
   Route::patch('/models/{legoModel}', [AdminController::class, 'updateModel']);
   Route::delete('/models/{legoModel}', [AdminController::class, 'deleteModel']);
+
+  // Rebrickable Data Management
+  Route::prefix('rebrickable')->group(function () {
+    Route::get('/stats', [RebrickableController::class, 'stats']);
+    Route::get('/tables', [RebrickableController::class, 'tables']);
+    Route::post('/import-all', [RebrickableController::class, 'importAllFromServer']);
+    Route::post('/clear-all', [RebrickableController::class, 'clearAll']);
+    Route::post('/{table}/import', [RebrickableController::class, 'import']);
+    Route::post('/{table}/import-server', [RebrickableController::class, 'importFromServer']);
+    Route::post('/{table}/clear', [RebrickableController::class, 'clear']);
+    Route::get('/{table}', [RebrickableController::class, 'index']);
+    Route::post('/{table}', [RebrickableController::class, 'store']);
+    Route::get('/{table}/{id}', [RebrickableController::class, 'show']);
+    Route::put('/{table}/{id}', [RebrickableController::class, 'update']);
+    Route::delete('/{table}/{id}', [RebrickableController::class, 'destroy']);
+  });
 });
 
 /*

@@ -7,6 +7,7 @@ use App\Models\LegoModel;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class LegoModelController extends Controller
 {
@@ -86,12 +87,71 @@ class LegoModelController extends Controller
 
     $model = $legoModel->load('user:id,name');
 
+    // Load inventory parts if set_num exists
+    if ($model->set_num) {
+      $model->load(['inventories.parts.part.category', 'inventories.parts.color']);
+
+      // Aggregate parts from all inventories
+      $partsMap = [];
+      foreach ($model->inventories as $inventory) {
+        foreach ($inventory->parts as $invPart) {
+          $key = $invPart->part_num . '-' . $invPart->color_id;
+          if (!isset($partsMap[$key])) {
+            // Get element for this part+color combination
+            $element = $invPart->part?->elements()->where('color_id', $invPart->color_id)->first();
+            $partsMap[$key] = [
+              'part_num' => $invPart->part_num,
+              'name' => $invPart->part?->name ?? 'Unknown',
+              'category' => $invPart->part?->category?->name ?? 'Unknown',
+              'color_id' => $invPart->color_id,
+              'color_name' => $invPart->color?->name ?? 'Unknown',
+              'color_rgb' => $invPart->color?->rgb ?? '000000',
+              'quantity' => 0,
+              'is_spare' => $invPart->is_spare,
+              'image_url' => $this->getPartImageUrl($invPart->part_num, $invPart->color_id),
+              'photo_url' => $element ? $this->getPartPhotoUrl($element->element_id) : null,
+              'bricklink_url' => $this->getPartBricklinkUrl($invPart->part_num, $invPart->color_id),
+            ];
+          }
+          $partsMap[$key]['quantity'] += $invPart->quantity;
+        }
+      }
+
+      // Sort parts by quantity descending
+      $parts = array_values($partsMap);
+      usort($parts, fn($a, $b) => $b['quantity'] - $a['quantity']);
+
+      // Unload inventories to clean up response
+      unset($model->inventories);
+
+      $model->parts = $parts;
+      $model->parts_count = count($parts);
+    }
+
     // If user doesn't have content access, remove LDR content from response
     if (!$legoModel->canAccessContent($request->user())) {
       $model->makeHidden('ldr_content');
     }
 
     return response()->json($model);
+  }
+
+  /**
+   * Helper methods for Rebrickable CDN URLs
+   */
+  private function getPartImageUrl(string $partNum, int $colorId): string
+  {
+    return "https://cdn.rebrickable.com/media/parts/ldraw/{$colorId}/{$partNum}.png";
+  }
+
+  private function getPartPhotoUrl(string $elementId): string
+  {
+    return "https://cdn.rebrickable.com/media/parts/elements/{$elementId}.jpg";
+  }
+
+  private function getPartBricklinkUrl(string $partNum, int $colorId): string
+  {
+    return "https://www.bricklink.com/v2/catalog/catalogitem.page?P={$partNum}&idColor={$colorId}";
   }
 
   /**
@@ -234,6 +294,63 @@ class LegoModelController extends Controller
     return response()->json([
       'message' => 'Model removed from your library successfully.',
       'owns' => false,
+    ]);
+  }
+
+  /**
+   * Upload a thumbnail for a model.
+   */
+  public function uploadThumbnail(Request $request, string $id): JsonResponse
+  {
+    $legoModel = LegoModel::findOrFail($id);
+
+    // Check ownership or admin status
+    $user = $request->user();
+    if (!$user || ($legoModel->user_id !== $user->id && !$user->canModerate())) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    $validated = $request->validate([
+      'thumbnail' => 'required|string', // Base64 image data
+    ]);
+
+    // Extract base64 data
+    $imageData = $validated['thumbnail'];
+
+    // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+    if (preg_match('/^data:image\/(\w+);base64,/', $imageData, $matches)) {
+      $imageData = substr($imageData, strpos($imageData, ',') + 1);
+      $extension = $matches[1];
+    } else {
+      $extension = 'png';
+    }
+
+    // Decode base64
+    $decodedImage = base64_decode($imageData);
+    if ($decodedImage === false) {
+      return response()->json(['message' => 'Invalid image data.'], 400);
+    }
+
+    // Generate unique filename
+    $filename = 'thumbnails/' . $legoModel->id . '_' . time() . '.' . $extension;
+
+    // Store in public disk
+    Storage::disk('public')->put($filename, $decodedImage);
+
+    // Delete old thumbnail if exists
+    if ($legoModel->thumbnail) {
+      Storage::disk('public')->delete($legoModel->thumbnail);
+    }
+
+    // Update model with new thumbnail path
+    $legoModel->update([
+      'thumbnail' => $filename,
+    ]);
+
+    return response()->json([
+      'message' => 'Thumbnail uploaded successfully.',
+      'thumbnail' => $legoModel->thumbnail,
+      'thumbnail_url' => asset('storage/' . $filename),
     ]);
   }
 }

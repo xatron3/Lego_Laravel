@@ -23,6 +23,7 @@ class LegoModel extends Model
     'is_public',
     'price',
     'thumbnail',
+    'set_num',
   ];
 
   protected $casts = [
@@ -35,6 +36,14 @@ class LegoModel extends Model
   public function user(): BelongsTo
   {
     return $this->belongsTo(User::class);
+  }
+
+  /**
+   * Get inventories for this model (if it has parts breakdown).
+   */
+  public function inventories(): \Illuminate\Database\Eloquent\Relations\HasMany
+  {
+    return $this->hasMany(Inventory::class, 'set_num', 'set_num');
   }
 
   /**
