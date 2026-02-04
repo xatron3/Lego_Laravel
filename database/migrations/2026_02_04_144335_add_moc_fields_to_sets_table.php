@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -20,7 +21,13 @@ return new class extends Migration
             $table->decimal('price', 10, 2)->nullable()->after('file_name');
             $table->boolean('is_public')->default(true)->after('price');
             $table->string('thumbnail')->nullable()->after('is_public');
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade')->after('thumbnail');
+
+            // For SQLite, add column without constraint (SQLite doesn't enforce FK anyway in memory)
+            if (DB::getDriverName() === 'sqlite') {
+                $table->unsignedBigInteger('user_id')->nullable()->after('thumbnail');
+            } else {
+                $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade')->after('thumbnail');
+            }
 
             // Add indexes
             $table->index('is_moc');
@@ -34,8 +41,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Drop foreign key only on non-SQLite databases
+        if (DB::getDriverName() !== 'sqlite') {
+            Schema::table('sets', function (Blueprint $table) {
+                $table->dropForeign(['user_id']);
+            });
+        }
+
         Schema::table('sets', function (Blueprint $table) {
-            $table->dropForeign(['user_id']);
             $table->dropIndex(['is_moc']);
             $table->dropIndex(['user_id']);
             $table->dropIndex(['is_public']);

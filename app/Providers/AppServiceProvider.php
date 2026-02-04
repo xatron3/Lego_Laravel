@@ -3,8 +3,6 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
-use App\Models\LegoModel;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,9 +19,6 @@ class AppServiceProvider extends ServiceProvider
    */
   public function boot(): void
   {
-    Route::bind('legoModel', function (string $value) {
-      file_put_contents(storage_path('logs/binding.txt'), "Binding called with value: $value\n", FILE_APPEND);
-      return LegoModel::findOrFail($value);
-    });
+    // Using explicit ID parameters with manual model loading (see copilot-instructions.md)
   }
 }

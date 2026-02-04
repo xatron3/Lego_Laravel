@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
-use App\Models\LegoModel;
+use App\Models\Moc;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,10 +28,10 @@ class AdminController extends Controller
         ],
       ],
       'models' => [
-        'total' => LegoModel::count(),
-        'public' => LegoModel::where('is_public', true)->count(),
-        'private' => LegoModel::where('is_public', false)->count(),
-        'paid' => LegoModel::whereNotNull('price')->where('price', '>', 0)->count(),
+        'total' => Moc::count(),
+        'public' => Moc::public()->count(),
+        'private' => Moc::where('is_public', false)->count(),
+        'paid' => Moc::whereNotNull('price')->where('price', '>', 0)->count(),
       ],
     ]);
   }
@@ -40,7 +41,7 @@ class AdminController extends Controller
    */
   public function users(Request $request): JsonResponse
   {
-    $users = User::withCount('legoModels')
+    $users = User::withCount('mocs')
       ->when($request->search, function ($query, $search) {
         $query->where(function ($q) use ($search) {
           $q->where('name', 'like', "%{$search}%")
@@ -118,11 +119,11 @@ class AdminController extends Controller
   }
 
   /**
-   * Get all models with pagination (for admin management).
+   * Get all MOCs with pagination (for admin management).
    */
   public function models(Request $request): JsonResponse
   {
-    $models = LegoModel::with('user:id,name,email')
+    $models = Moc::with(['user:id,name,email', 'images'])
       ->when($request->search, function ($query, $search) {
         $query->where(function ($q) use ($search) {
           $q->where('name', 'like', "%{$search}%")
@@ -142,32 +143,78 @@ class AdminController extends Controller
   }
 
   /**
-   * Update model visibility/status (admin action).
+   * Update MOC visibility/status (admin action).
    */
-  public function updateModel(Request $request, LegoModel $legoModel): JsonResponse
+  public function updateModel(Request $request, string $id): JsonResponse
   {
+    $moc = Moc::findOrFail($id);
+
     $validated = $request->validate([
       'is_public' => ['sometimes', 'boolean'],
       'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
     ]);
 
-    $legoModel->update($validated);
+    $moc->update($validated);
 
     return response()->json([
-      'message' => 'Model updated successfully.',
-      'model' => $legoModel->fresh(),
+      'message' => 'MOC updated successfully.',
+      'model' => $moc->fresh(['images']),
     ]);
   }
 
   /**
-   * Delete a model (admin action).
+   * Delete a MOC (admin action).
    */
-  public function deleteModel(LegoModel $legoModel): JsonResponse
+  public function deleteModel(string $id): JsonResponse
   {
-    $legoModel->delete();
+    $moc = Moc::findOrFail($id);
+    $moc->delete();
 
     return response()->json([
-      'message' => 'Model deleted successfully.',
+      'message' => 'MOC deleted successfully.',
+    ]);
+  }
+
+  /**
+   * Get admin sales analytics.
+   */
+  public function sales(Request $request): JsonResponse
+  {
+    // Check if user is admin
+    if ($request->user()->role !== UserRole::ADMIN) {
+      return response()->json(['error' => 'Unauthorized'], 403);
+    }
+
+    $totalSales = Order::where('status', 'completed')->count();
+    $totalRevenue = Order::where('status', 'completed')->sum('total');
+    $platformRevenue = Order::where('status', 'completed')->sum('platform_fee');
+
+    // Get recent 50 sales with buyer, seller, and MOC info
+    $recentSales = Order::where('status', 'completed')
+      ->with(['user:id,name', 'items.moc:id,set_num,name', 'items.seller:id,name'])
+      ->orderBy('created_at', 'desc')
+      ->limit(50)
+      ->get()
+      ->flatMap(function ($order) {
+        return $order->items->map(function ($item) use ($order) {
+          return [
+            'id' => $order->id,
+            'buyer_name' => $order->user->name ?? 'Unknown',
+            'seller_name' => $item->seller->name ?? 'Unknown',
+            'moc_name' => $item->moc->name ?? 'Unknown',
+            'total' => $order->total,
+            'platform_fee' => $order->platform_fee,
+            'created_at' => $order->created_at,
+          ];
+        });
+      })
+      ->take(50);
+
+    return response()->json([
+      'total_sales' => $totalSales,
+      'total_revenue' => round((float)$totalRevenue, 2),
+      'platform_revenue' => round((float)$platformRevenue, 2),
+      'recent_sales' => $recentSales,
     ]);
   }
 }

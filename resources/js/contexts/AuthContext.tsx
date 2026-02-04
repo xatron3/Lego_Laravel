@@ -1,10 +1,5 @@
-import React, {
-    createContext,
-    useContext,
-    useState,
-    useEffect,
-    useCallback,
-} from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { router } from "@inertiajs/react";
 
 export interface User {
     id: number;
@@ -63,38 +58,33 @@ function getCsrfToken(): string {
     return "";
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+export function AuthProvider({
+    children,
+    initialUser,
+}: {
+    children: React.ReactNode;
+    initialUser?: User | null;
+}) {
+    const [user, setUser] = useState<User | null>(initialUser || null);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const refreshUser = useCallback(async () => {
-        try {
-            const response = await fetch("/api/auth/user", {
-                headers: {
-                    Accept: "application/json",
-                },
-                credentials: "same-origin",
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log("RefreshUser response:", data);
-                // Only set user if we actually received user data (not null)
-                setUser(data && data.id ? data : null);
-            } else {
-                setUser(null);
+    // Listen for Inertia navigation events to update user
+    useEffect(() => {
+        const handlePageChange = (event: any) => {
+            if (event.detail?.page?.props?.auth?.user !== undefined) {
+                setUser(event.detail.page.props.auth.user);
             }
-        } catch (error) {
-            console.error("Failed to fetch user:", error);
-            setUser(null);
-        } finally {
-            setIsLoading(false);
-        }
+        };
+
+        document.addEventListener("inertia:success", handlePageChange);
+        return () =>
+            document.removeEventListener("inertia:success", handlePageChange);
     }, []);
 
-    useEffect(() => {
-        refreshUser();
-    }, [refreshUser]);
+    const refreshUser = async () => {
+        // Reload the current page to get fresh auth data from server
+        router.reload({ only: ["auth"] });
+    };
 
     const login = async (email: string, password: string, remember = false) => {
         // Get CSRF cookie first

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "@inertiajs/react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
-import { api } from "../api";
+import { mocUrl } from "../utils/seoUrls";
 
 interface Stats {
     total_models: number;
@@ -20,46 +20,17 @@ interface FeaturedModel {
     total_parts: number;
     total_steps: number;
     price: number | null;
-    user: { name: string };
+    user: { name: string } | null;
 }
 
-export default function Welcome() {
+interface WelcomeProps {
+    stats: Stats;
+    featuredModels: FeaturedModel[];
+}
+
+export default function Welcome({ stats, featuredModels }: WelcomeProps) {
     const { isAuthenticated } = useAuth();
     const [showAuthModal, setShowAuthModal] = useState(false);
-    const [stats, setStats] = useState<Stats>({
-        total_models: 0,
-        total_parts: 0,
-        total_users: 0,
-        free_models: 0,
-        paid_models: 0,
-    });
-    const [featuredModels, setFeaturedModels] = useState<FeaturedModel[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        loadStats();
-        loadFeaturedModels();
-    }, []);
-
-    const loadStats = async () => {
-        try {
-            const data = await api.getStats();
-            setStats(data);
-        } catch (error) {
-            console.error("Failed to load stats:", error);
-        }
-    };
-
-    const loadFeaturedModels = async () => {
-        try {
-            const data = await api.getStoreModels({ featured: true, limit: 6 });
-            setFeaturedModels(data as FeaturedModel[]);
-        } catch (error) {
-            console.error("Failed to load featured models:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -147,16 +118,12 @@ export default function Welcome() {
                         </p>
                     </div>
 
-                    {isLoading ? (
-                        <div className="flex justify-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
-                        </div>
-                    ) : featuredModels.length > 0 ? (
+                    {featuredModels.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {featuredModels.map((model) => (
                                 <Link
                                     key={model.id}
-                                    href={`/model/${model.id}`}
+                                    href={mocUrl(model)}
                                     className="group bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-yellow-500/50 transition-all hover:shadow-lg hover:shadow-yellow-500/10"
                                 >
                                     <div className="aspect-video bg-gray-700 relative overflow-hidden">

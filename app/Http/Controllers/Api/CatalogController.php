@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Color;
 use App\Models\Minifig;
+use App\Models\Moc;
 use App\Models\Part;
 use App\Models\PartCategory;
 use App\Models\Set;
-use App\Models\MocSet;
 use App\Models\Theme;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,8 +21,8 @@ class CatalogController extends Controller
     public function stats(): JsonResponse
     {
         return response()->json([
-            'sets' => Set::count(),
-            'mocs' => \App\Models\MocSet::count(),
+            'sets' => Set::official()->count(),
+            'mocs' => Moc::public()->count(),
             'parts' => Part::count(),
             'minifigs' => Minifig::count(),
             'colors' => Color::count(),
@@ -661,7 +661,9 @@ class CatalogController extends Controller
      */
     public function mocs(Request $request): JsonResponse
     {
-        $query = MocSet::query()->with('theme')->visibleTo($request->user());
+        $query = Moc::query()
+            ->with(['set.theme', 'user:id,name', 'images'])
+            ->visibleTo($request->user());
 
         // Search by name or set number
         if ($search = $request->get('search')) {
@@ -671,15 +673,12 @@ class CatalogController extends Controller
             });
         }
 
-        // Filter by theme
+        // Filter by theme (through set relationship)
         if ($themeId = $request->get('theme_id')) {
             $themeIds = $this->getThemeWithChildren((int) $themeId);
-            $query->whereIn('theme_id', $themeIds);
-        }
-
-        // Filter by year
-        if ($year = $request->get('year')) {
-            $query->where('year', (int) $year);
+            $query->whereHas('set', function ($q) use ($themeIds) {
+                $q->whereIn('theme_id', $themeIds);
+            });
         }
 
         // Filter by price range
@@ -699,14 +698,14 @@ class CatalogController extends Controller
 
         // Filter by min parts
         if ($minParts = $request->get('min_parts')) {
-            $query->where('num_parts', '>=', (int) $minParts);
+            $query->where('total_parts', '>=', (int) $minParts);
         }
 
         // Sorting
-        $sortBy = $request->get('sort', 'year');
+        $sortBy = $request->get('sort', 'created_at');
         $sortDir = $request->get('direction', 'desc');
 
-        $allowedSorts = ['name', 'year', 'num_parts', 'set_num', 'price'];
+        $allowedSorts = ['name', 'total_parts', 'set_num', 'price', 'created_at'];
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDir);
         }
@@ -714,12 +713,6 @@ class CatalogController extends Controller
         $perPage = min($request->get('per_page', 24), 100);
 
         $result = $query->paginate($perPage);
-
-        // Add image URLs (use thumbnail if available)
-        $result->getCollection()->transform(function ($moc) {
-            $moc->image_url = $moc->thumbnail ?? $this->getSetImageUrl($moc->set_num);
-            return $moc;
-        });
 
         return response()->json($result);
     }
@@ -729,7 +722,14 @@ class CatalogController extends Controller
      */
     public function showMoc(Request $request, string $setNum): JsonResponse
     {
-        $moc = MocSet::with(['theme.parent', 'inventories.parts.part.category', 'inventories.parts.color', 'inventories.minifigs.minifig', 'user'])
+        $moc = Moc::with([
+            'set.theme.parent',
+            'set.inventories.parts.part.category',
+            'set.inventories.parts.color',
+            'set.inventories.minifigs.minifig',
+            'user:id,name',
+            'images'
+        ])
             ->where('set_num', $setNum)
             ->firstOrFail();
 
@@ -743,48 +743,49 @@ class CatalogController extends Controller
             $moc->makeHidden('ldr_content');
         }
 
-        $moc->image_url = $moc->thumbnail ?? $this->getSetImageUrl($moc->set_num);
         $moc->bricklink_url = $this->getSetBricklinkUrl($moc->set_num);
 
-        // Aggregate parts from all inventories
+        // Aggregate parts from the set's inventories
         $partsMap = [];
         $minifigsMap = [];
 
-        foreach ($moc->inventories as $inventory) {
-            foreach ($inventory->parts as $invPart) {
-                $key = $invPart->part_num . '_' . $invPart->color_id;
-                if (!isset($partsMap[$key])) {
-                    $element = $invPart->part?->elements()->where('color_id', $invPart->color_id)->first();
-                    $partsMap[$key] = [
-                        'part_num' => $invPart->part_num,
-                        'name' => $invPart->part?->name ?? 'Unknown',
-                        'category' => $invPart->part?->category?->name ?? 'Unknown',
-                        'color_id' => $invPart->color_id,
-                        'color_name' => $invPart->color?->name ?? 'Unknown',
-                        'color_rgb' => $invPart->color?->rgb ?? '000000',
-                        'quantity' => 0,
-                        'is_spare' => $invPart->is_spare,
-                        'image_url' => $this->getPartImageUrl($invPart->part_num, $invPart->color_id),
-                        'photo_url' => $element ? $this->getPartPhotoUrl($element->element_id) : null,
-                        'bricklink_url' => $this->getPartBricklinkUrl($invPart->part_num, $invPart->color_id),
-                    ];
+        if ($moc->set) {
+            foreach ($moc->set->inventories as $inventory) {
+                foreach ($inventory->parts as $invPart) {
+                    $key = $invPart->part_num . '_' . $invPart->color_id;
+                    if (!isset($partsMap[$key])) {
+                        $element = $invPart->part?->elements()->where('color_id', $invPart->color_id)->first();
+                        $partsMap[$key] = [
+                            'part_num' => $invPart->part_num,
+                            'name' => $invPart->part?->name ?? 'Unknown',
+                            'category' => $invPart->part?->category?->name ?? 'Unknown',
+                            'color_id' => $invPart->color_id,
+                            'color_name' => $invPart->color?->name ?? 'Unknown',
+                            'color_rgb' => $invPart->color?->rgb ?? '000000',
+                            'quantity' => 0,
+                            'is_spare' => $invPart->is_spare,
+                            'image_url' => $this->getPartImageUrl($invPart->part_num, $invPart->color_id),
+                            'photo_url' => $element ? $this->getPartPhotoUrl($element->element_id) : null,
+                            'bricklink_url' => $this->getPartBricklinkUrl($invPart->part_num, $invPart->color_id),
+                        ];
+                    }
+                    $partsMap[$key]['quantity'] += $invPart->quantity;
                 }
-                $partsMap[$key]['quantity'] += $invPart->quantity;
-            }
 
-            foreach ($inventory->minifigs as $invMinifig) {
-                $key = $invMinifig->fig_num;
-                if (!isset($minifigsMap[$key])) {
-                    $minifigsMap[$key] = [
-                        'fig_num' => $invMinifig->fig_num,
-                        'name' => $invMinifig->minifig?->name ?? 'Unknown',
-                        'num_parts' => $invMinifig->minifig?->num_parts ?? 0,
-                        'quantity' => 0,
-                        'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num),
-                        'bricklink_url' => $this->getMinifigBricklinkUrl($invMinifig->fig_num),
-                    ];
+                foreach ($inventory->minifigs as $invMinifig) {
+                    $key = $invMinifig->fig_num;
+                    if (!isset($minifigsMap[$key])) {
+                        $minifigsMap[$key] = [
+                            'fig_num' => $invMinifig->fig_num,
+                            'name' => $invMinifig->minifig?->name ?? 'Unknown',
+                            'num_parts' => $invMinifig->minifig?->num_parts ?? 0,
+                            'quantity' => 0,
+                            'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num),
+                            'bricklink_url' => $this->getMinifigBricklinkUrl($invMinifig->fig_num),
+                        ];
+                    }
+                    $minifigsMap[$key]['quantity'] += $invMinifig->quantity;
                 }
-                $minifigsMap[$key]['quantity'] += $invMinifig->quantity;
             }
         }
 
@@ -794,7 +795,10 @@ class CatalogController extends Controller
 
         $minifigs = array_values($minifigsMap);
 
-        unset($moc->inventories);
+        // Unload the set.inventories to clean up response
+        if ($moc->set) {
+            unset($moc->set->inventories);
+        }
 
         $moc->parts = $parts;
         $moc->parts_count = count($parts);

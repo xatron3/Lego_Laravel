@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Hash;
 class DashboardController extends Controller
 {
   /**
-   * Get models for the dashboard with ownership filter.
+   * Get MOCs for the dashboard with ownership filter.
    */
   public function models(Request $request): JsonResponse
   {
@@ -20,10 +20,10 @@ class DashboardController extends Controller
     $models = collect();
 
     if ($filter === 'created' || $filter === 'all') {
-      // Models created by the user
-      $createdModels = $user->legoModels()
-        ->with('user:id,name')
-        ->get(['id', 'name', 'description', 'file_name', 'total_steps', 'total_parts', 'user_id', 'is_public', 'price', 'thumbnail', 'created_at'])
+      // MOCs created by the user
+      $createdModels = $user->mocs()
+        ->with(['user:id,name', 'images'])
+        ->get(['id', 'set_num', 'name', 'description', 'file_name', 'total_steps', 'total_parts', 'user_id', 'is_public', 'price', 'created_at'])
         ->map(function ($model) {
           $model->ownership_type = 'created';
           return $model;
@@ -33,9 +33,9 @@ class DashboardController extends Controller
     }
 
     if ($filter === 'owned' || $filter === 'all') {
-      // Models owned (purchased/claimed) by the user
-      $ownedModels = $user->ownedModels()
-        ->with('user:id,name')
+      // MOCs owned (purchased/claimed) by the user
+      $ownedModels = $user->ownedMocs()
+        ->with(['user:id,name', 'images'])
         ->get()
         ->map(function ($model) {
           $model->ownership_type = $model->pivot->type;
@@ -45,7 +45,7 @@ class DashboardController extends Controller
       $models = $models->merge($ownedModels);
     }
 
-    // Remove duplicates (if a user created and claimed the same model, keep created)
+    // Remove duplicates (if a user created and claimed the same MOC, keep created)
     $models = $models->unique('id')->sortByDesc('created_at')->values();
 
     return response()->json($models);

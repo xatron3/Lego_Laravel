@@ -3,6 +3,7 @@ import { router } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useAuth } from "../contexts/AuthContext";
+import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import Scene from "../Scene";
@@ -14,14 +15,17 @@ interface ModelDetailProps {
 
 export default function ModelDetail({ id }: ModelDetailProps) {
     const { user, isAuthenticated } = useAuth();
+    const { isInCart, addToCart, removeFromCart } = useCart();
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [model, setModel] = useState<LegoModelData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddingToLibrary, setIsAddingToLibrary] = useState(false);
+    const [isAddingToCart, setIsAddingToCart] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
     const [alreadyOwned, setAlreadyOwned] = useState(false);
     const [ownershipType, setOwnershipType] = useState<string | null>(null);
     const [loadError, setLoadError] = useState(false);
+    const [cartError, setCartError] = useState<string | null>(null);
     const [loadingProgress, setLoadingProgress] = useState({
         loaded: 0,
         total: 0,
@@ -71,6 +75,39 @@ export default function ModelDetail({ id }: ModelDetailProps) {
             alert(error.message || "Failed to add to library");
         } finally {
             setIsAddingToLibrary(false);
+        }
+    };
+
+    const handleAddToCart = async () => {
+        if (!isAuthenticated) {
+            setShowAuthModal(true);
+            return;
+        }
+
+        if (!model?.id) return;
+
+        setIsAddingToCart(true);
+        setCartError(null);
+
+        try {
+            await addToCart(model.id);
+        } catch (error: any) {
+            setCartError(error.message || "Failed to add to cart");
+        } finally {
+            setIsAddingToCart(false);
+        }
+    };
+
+    const handleRemoveFromCart = async () => {
+        if (!model?.id) return;
+
+        setIsAddingToCart(true);
+        try {
+            await removeFromCart(model.id);
+        } catch (error: any) {
+            console.error("Failed to remove from cart:", error);
+        } finally {
+            setIsAddingToCart(false);
         }
     };
 
@@ -232,8 +269,8 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                                 ) : (
                                                     <span className="px-3 py-1 bg-linear-to-r from-yellow-400 to-orange-500 text-gray-900 text-sm font-bold rounded-full">
                                                         $
-                                                        {(
-                                                            model.price ?? 0
+                                                        {Number(
+                                                            model.price ?? 0,
                                                         ).toFixed(2)}
                                                     </span>
                                                 )}
@@ -308,6 +345,12 @@ export default function ModelDetail({ id }: ModelDetailProps) {
 
                                     {/* Action Buttons */}
                                     <div className="space-y-3">
+                                        {cartError && (
+                                            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                                                {cartError}
+                                            </div>
+                                        )}
+
                                         {isOwner ? (
                                             <div className="p-4 bg-gray-700 rounded-lg border border-gray-600 text-center">
                                                 <p className="text-gray-300">
@@ -347,21 +390,87 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                                         </button>
                                                     )}
                                             </>
-                                        ) : (
+                                        ) : isFree ? (
+                                            // Free model - just claim it
                                             <button
                                                 onClick={handleAddToLibrary}
                                                 disabled={isAddingToLibrary}
-                                                className="w-full px-6 py-4 bg-linear-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all disabled:opacity-50"
+                                                className="w-full px-6 py-4 bg-linear-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold text-lg rounded-xl transition-all disabled:opacity-50"
                                             >
                                                 {isAddingToLibrary ? (
+                                                    <span className="flex items-center justify-center gap-2">
+                                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                        Adding...
+                                                    </span>
+                                                ) : (
+                                                    "Add to Library (Free)"
+                                                )}
+                                            </button>
+                                        ) : model.id && isInCart(model.id) ? (
+                                            // Paid model already in cart
+                                            <>
+                                                <div className="p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/50 text-center">
+                                                    <p className="text-yellow-400 font-medium flex items-center justify-center gap-2">
+                                                        <svg
+                                                            className="w-5 h-5"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                                                            />
+                                                        </svg>
+                                                        In your cart
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={
+                                                        handleRemoveFromCart
+                                                    }
+                                                    disabled={isAddingToCart}
+                                                    className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-red-400 font-medium rounded-lg transition-colors disabled:opacity-50 border border-gray-600"
+                                                >
+                                                    {isAddingToCart
+                                                        ? "Removing..."
+                                                        : "Remove from Cart"}
+                                                </button>
+                                            </>
+                                        ) : (
+                                            // Paid model not in cart
+                                            <button
+                                                onClick={handleAddToCart}
+                                                disabled={isAddingToCart}
+                                                className="w-full px-6 py-4 bg-linear-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                                            >
+                                                {isAddingToCart ? (
                                                     <span className="flex items-center justify-center gap-2">
                                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
                                                         Adding...
                                                     </span>
-                                                ) : isFree ? (
-                                                    "Add to Library (Free)"
                                                 ) : (
-                                                    `Purchase for $${(model.price ?? 0).toFixed(2)}`
+                                                    <>
+                                                        <svg
+                                                            className="w-5 h-5"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                                                            />
+                                                        </svg>
+                                                        Add to Cart - $
+                                                        {Number(
+                                                            model.price ?? 0,
+                                                        ).toFixed(2)}
+                                                    </>
                                                 )}
                                             </button>
                                         )}

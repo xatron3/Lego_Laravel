@@ -80,13 +80,95 @@ if (!$legoModel->canAccessContent($request->user())) {
 }
 ```
 
+### Inertia.js Performance Pattern (CRITICAL)
+
+**ALWAYS prefer Inertia shared props over API calls** - this is essential for performance and eliminates loading delays/flickering.
+
+#### Share Common Data via Middleware
+
+Global data needed on every page should be shared in `HandleInertiaRequests::share()`:
+
+```php
+// app/Http/Middleware/HandleInertiaRequests.php
+public function share(Request $request): array
+{
+    return [
+        ...parent::share($request),
+        'auth' => [
+            'user' => $request->user()?->only('id', 'name', 'email', 'role', 'avatar'),
+        ],
+        'cart' => [
+            'count' => $request->user()?->cartItems()->sum('quantity') ?? 0,
+        ],
+    ];
+}
+```
+
+#### Pass Page-Specific Data via Controllers
+
+Page data should be passed via `Inertia::render()` in controllers, not fetched via API calls in components:
+
+```php
+// ✅ Correct: Server-side data hydration
+public function index(Request $request)
+{
+    return Inertia::render('Catalog', [
+        'initialStats' => [...],
+        'sets' => Set::paginate(24),
+    ]);
+}
+
+// ❌ Avoid: Client-side API fetching
+public function index()
+{
+    return Inertia::render('Catalog'); // Component makes API call in useEffect
+}
+```
+
+#### Use Inertia Navigation for Filtering/Updates
+
+Use `router.get()` or `router.reload()` instead of manual API fetches:
+
+```typescript
+import { router } from "@inertiajs/react";
+
+// ✅ Correct: Inertia navigation
+const handleFilter = (theme: string) => {
+    router.get("/catalog", { theme }, { preserveScroll: true });
+};
+
+// ❌ Avoid: Manual API calls
+const handleFilter = async (theme: string) => {
+    const data = await api.getCatalog({ theme });
+    setSets(data.sets);
+};
+```
+
+#### Receive Initial Props in Components
+
+Components receive server data via props, eliminating loading states:
+
+```typescript
+interface CatalogProps {
+    initialStats: Stats;
+    sets: PaginatedResponse<Set>;
+}
+
+export default function Catalog({ initialStats, sets }: CatalogProps) {
+    // No useEffect, no API calls, instant render with data
+    return <div>{sets.data.map(...)}</div>;
+}
+```
+
+**Benefits**: Eliminates ~1 second delays, removes loading spinners, prevents auth flickering, improves perceived performance.
+
 ### Frontend API Calls
 
-Use the `api` object from `resources/js/api.ts` - includes CSRF token handling:
+Only use the `api` object from `resources/js/api.ts` for actions that modify data (POST/PUT/DELETE):
 
 ```typescript
 import { api } from "./api";
-const models = await api.getModels();
+await api.createModel(formData); // ✅ Mutations only
 ```
 
 ### Three.js/LDraw Integration
@@ -98,6 +180,57 @@ const models = await api.getModels();
 ### React Components
 
 - Single-page app with catch-all route for client-side routing
+- Components use Tailwind CSS 4 with dark theme (gray-900 background)
+- 3D canvas uses `@react-three/fiber` with `OrbitControls`
+
+## Code Quality & SOLID Principles
+
+### Always Follow SOLID Principles
+
+When writing or modifying code, always adhere to SOLID principles:
+
+1. **Single Responsibility Principle (SRP)**: Each component, function, or class should have one clear purpose
+    - Extract large components into smaller, focused ones
+    - Separate data fetching, business logic, and UI rendering
+    - Example: Detail pages delegate rendering to specialized components (`SetDetail`, `PartDetail`, etc.)
+
+2. **Don't Repeat Yourself (DRY)**: Eliminate code duplication
+    - Extract reusable components (e.g., `SetCard`, `LoadingState`, `Pagination`)
+    - Create custom hooks for common logic (e.g., `useImageFallback`, `usePagination`)
+    - Use utility functions/helpers for repeated operations
+
+3. **Dependency Inversion**: Depend on abstractions, not concrete implementations
+    - Components should receive data via props, not make direct API calls when possible
+    - Use dependency injection patterns where appropriate
+
+### Code Cleanliness Standards
+
+**Proactive Refactoring**: When you encounter code that could be improved, **always refactor it** unless explicitly told not to. Don't wait for permission.
+
+- **Remove Dead Code**: Delete unused imports, variables, functions, and components immediately
+- **Extract Reusable Logic**: If you see the same pattern 2+ times, extract it into a helper/hook/component
+- **Simplify Complex Functions**: Break down functions longer than 30 lines into smaller, well-named functions
+- **Use Descriptive Names**: Variable and function names should clearly communicate purpose
+- **Add Documentation**: Include JSDoc comments for exported functions and complex logic
+
+### File Organization
+
+- **Shared Components**: Place reusable UI components in `resources/js/components/`
+- **Feature-Specific Components**: Group related components in subdirectories (e.g., `components/catalog/`)
+- **Custom Hooks**: Store in `resources/js/hooks/` with descriptive names starting with `use`
+- **Utility Functions**: Create `resources/js/utils/` for pure helper functions
+- **Type Definitions**: Keep types close to where they're used, or in `api.ts` for API-related types
+
+### When Reviewing/Modifying Existing Code
+
+1. **Identify Violations**: Look for SRP violations, duplication, unused code
+2. **Refactor Proactively**: Fix issues you find, even if they're not part of the current task
+3. **Extract and Reuse**: Create shared components/hooks if beneficial
+4. **Maintain Consistency**: Follow existing patterns in the codebase (e.g., Tailwind classes, component structure)
+5. **Test After Refactoring**: Ensure functionality remains unchanged
+
+### React Components
+
 - Components use Tailwind CSS 4 with dark theme (gray-900 background)
 - 3D canvas uses `@react-three/fiber` with `OrbitControls`
 

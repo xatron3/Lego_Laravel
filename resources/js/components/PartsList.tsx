@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import React from "react";
 import { Step } from "../parser";
 
 interface PartsListProps {
@@ -11,7 +12,7 @@ interface PartCount {
     count: number;
 }
 
-export default function PartsList({ steps, currentStep }: PartsListProps) {
+function PartsList({ steps, currentStep }: PartsListProps) {
     const [showAllParts, setShowAllParts] = useState(false);
 
     // Calculate total parts for entire model
@@ -162,3 +163,5 @@ export default function PartsList({ steps, currentStep }: PartsListProps) {
         </div>
     );
 }
+
+export default React.memo(PartsList);

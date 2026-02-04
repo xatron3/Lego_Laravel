@@ -1,3 +1,5 @@
+import React from "react";
+
 interface StepControlsProps {
     currentStep: number;
     totalSteps: number;
@@ -15,7 +17,7 @@ interface StepControlsProps {
     onBorderColorChange: (color: string) => void;
 }
 
-export default function StepControls({
+function StepControls({
     currentStep,
     totalSteps,
     onPrevious,
@@ -261,3 +263,5 @@ export default function StepControls({
         </div>
     );
 }
+
+export default React.memo(StepControls);

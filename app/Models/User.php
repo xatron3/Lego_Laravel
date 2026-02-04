@@ -53,35 +53,66 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the user's LEGO models (created by the user).
+     * Get the user's MOCs (created by the user).
      */
-    public function legoModels(): HasMany
+    public function mocs(): HasMany
     {
-        return $this->hasMany(LegoModel::class);
+        return $this->hasMany(Moc::class);
     }
 
     /**
-     * Get the models owned by this user (purchased or claimed).
+     * Get the MOCs owned by this user (purchased or claimed).
      */
-    public function ownedModels(): BelongsToMany
+    public function ownedMocs(): BelongsToMany
     {
-        return $this->belongsToMany(LegoModel::class, 'user_owned_models')
+        return $this->belongsToMany(Moc::class, 'user_owned_models', 'user_id', 'moc_id')
             ->withPivot(['type', 'price_paid'])
             ->withTimestamps();
     }
 
     /**
-     * Check if user owns a specific model.
+     * Check if user owns a specific MOC.
      */
-    public function ownsModel(LegoModel $model): bool
+    public function ownsMoc(Moc $moc): bool
     {
-        // User created the model
-        if ($model->user_id === $this->id) {
+        // User created the MOC
+        if ($moc->user_id === $this->id) {
             return true;
         }
 
-        // User has claimed or purchased the model
-        return $this->ownedModels()->where('lego_model_id', $model->id)->exists();
+        // User has claimed or purchased the MOC
+        return $this->ownedMocs()->where('moc_id', $moc->id)->exists();
+    }
+
+    /**
+     * @deprecated Use mocs() instead
+     */
+    public function legoModels(): HasMany
+    {
+        return $this->mocs();
+    }
+
+    /**
+     * @deprecated Use ownedMocs() instead
+     */
+    public function ownedModels(): BelongsToMany
+    {
+        return $this->ownedMocs();
+    }
+
+    /**
+     * @deprecated Use ownsMoc() instead
+     */
+    public function ownsModel($model): bool
+    {
+        if ($model instanceof Moc) {
+            return $this->ownsMoc($model);
+        }
+        // Backward compatibility
+        if ($model->user_id === $this->id) {
+            return true;
+        }
+        return $this->ownedMocs()->where('moc_id', $model->id)->exists();
     }
 
     /**
@@ -146,5 +177,49 @@ class User extends Authenticatable
     public function canModerate(): bool
     {
         return $this->isMod();
+    }
+
+    /**
+     * Get cart items for this user.
+     */
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
+    /**
+     * Get orders placed by this user.
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Get seller earnings for this user.
+     */
+    public function sellerEarnings(): HasMany
+    {
+        return $this->hasMany(SellerEarning::class);
+    }
+
+    /**
+     * Get total pending earnings.
+     */
+    public function getPendingEarnings(): float
+    {
+        return (float) $this->sellerEarnings()
+            ->where('status', 'pending')
+            ->sum('amount');
+    }
+
+    /**
+     * Get total paid earnings.
+     */
+    public function getPaidEarnings(): float
+    {
+        return (float) $this->sellerEarnings()
+            ->where('status', 'paid')
+            ->sum('amount');
     }
 }

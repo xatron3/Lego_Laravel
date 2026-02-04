@@ -10,6 +10,13 @@ return Application::configure(basePath: dirname(__DIR__))
     api: __DIR__ . '/../routes/api.php',
     commands: __DIR__ . '/../routes/console.php',
     health: '/up',
+    then: function () {
+      // Load additional route files for better organization
+      require __DIR__ . '/../routes/auth.php';
+      require __DIR__ . '/../routes/admin.php';
+      require __DIR__ . '/../routes/catalog.php';
+      require __DIR__ . '/../routes/ldraw.php';
+    },
   )
   ->withMiddleware(function (Middleware $middleware): void {
     $middleware->web(append: [

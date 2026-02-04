@@ -36,7 +36,7 @@ export interface LegoModelData {
     total_parts: number;
     user_id?: number;
     is_public?: boolean;
-    price?: number | null;
+    price?: number | string | null;
     thumbnail?: string | null;
     created_at?: string;
     set_num?: string;
@@ -60,6 +60,71 @@ export interface InventoryPartData {
     image_url: string;
     photo_url?: string;
     bricklink_url: string;
+}
+
+// Cart & Checkout Types
+export interface CartItemModel {
+    id: number;
+    name: string;
+    description?: string;
+    price: number | string;
+    thumbnail?: string | null;
+    total_parts: number;
+    total_steps: number;
+    user?: {
+        id: number;
+        name: string;
+    } | null;
+}
+
+export interface CartItemData {
+    id: number;
+    moc_id: number;
+    moc: CartItemModel | null;
+    created_at: string;
+}
+
+export interface CartData {
+    items: CartItemData[];
+    subtotal: number;
+    platform_fee: number;
+    total: number;
+    count: number;
+}
+
+export interface OrderItemData {
+    id: number;
+    moc_id: number;
+    seller_id: number;
+    price: string;
+    seller_amount: string;
+    platform_amount: string;
+    moc?: {
+        id: number;
+        set_num: string;
+        name: string;
+        thumbnail?: string | null;
+        price?: number;
+        description?: string;
+    };
+    seller?: {
+        id: number;
+        name: string;
+    };
+}
+
+export interface OrderData {
+    id: number;
+    user_id: number;
+    stripe_checkout_session_id?: string;
+    stripe_payment_intent_id?: string;
+    status: "pending" | "completed" | "failed" | "refunded";
+    subtotal: string;
+    platform_fee: string;
+    total: string;
+    created_at: string;
+    updated_at: string;
+    items?: OrderItemData[];
 }
 
 export const api = {
@@ -754,6 +819,224 @@ export const api = {
             credentials: "same-origin",
         });
         if (!response.ok) throw new Error("Failed to fetch year range");
+        return response.json();
+    },
+
+    // ==================== Cart API ====================
+
+    async getCart(): Promise<CartData> {
+        const response = await fetch(`${API_BASE}/cart`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch cart");
+        return response.json();
+    },
+
+    async addToCart(
+        modelId: number,
+    ): Promise<{ message: string; cart_item_id: number }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/cart`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ moc_id: modelId }),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to add to cart");
+        }
+        return response.json();
+    },
+
+    async removeFromCart(modelId: number): Promise<{ message: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/cart/${modelId}`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to remove from cart");
+        }
+        return response.json();
+    },
+
+    async clearCart(): Promise<{ message: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/cart`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to clear cart");
+        }
+        return response.json();
+    },
+
+    async getCartCount(): Promise<{ count: number }> {
+        const response = await fetch(`${API_BASE}/cart/count`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch cart count");
+        return response.json();
+    },
+
+    async checkInCart(modelId: number): Promise<{ in_cart: boolean }> {
+        const response = await fetch(`${API_BASE}/cart/check/${modelId}`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to check cart");
+        return response.json();
+    },
+
+    // ==================== Checkout API ====================
+
+    async createCheckoutSession(): Promise<{
+        checkout_url: string;
+        session_id: string;
+    }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/checkout/session`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(
+                error.message || "Failed to create checkout session",
+            );
+        }
+        return response.json();
+    },
+
+    async verifyCheckout(
+        sessionId: string,
+    ): Promise<{ message: string; order_id: number; status: string }> {
+        const response = await fetch(
+            `${API_BASE}/checkout/success?session_id=${sessionId}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to verify checkout");
+        }
+        return response.json();
+    },
+
+    async getOrders(): Promise<OrderData[]> {
+        const response = await fetch(`${API_BASE}/checkout/orders`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch orders");
+        return response.json();
+    },
+
+    async getOrder(orderId: number): Promise<OrderData> {
+        const response = await fetch(`${API_BASE}/checkout/orders/${orderId}`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch order");
+        return response.json();
+    },
+
+    // Seller Analytics
+    async getSellerAnalytics(): Promise<{
+        summary: {
+            total_earnings: number;
+            pending_earnings: number;
+            paid_earnings: number;
+            total_sales: number;
+        };
+        top_models: Array<{
+            model_id: number;
+            model_name: string;
+            model_thumbnail?: string;
+            model_price: number;
+            sales_count: number;
+            revenue: number;
+        }>;
+        recent_sales: Array<{
+            id: number;
+            model_name: string;
+            model_thumbnail?: string;
+            buyer_name: string;
+            amount: string;
+            date: string;
+        }>;
+        sales_chart: Array<{
+            date: string;
+            count: number;
+            revenue: string;
+        }>;
+    }> {
+        const response = await fetch(`${API_BASE}/seller/analytics`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch seller analytics");
+        return response.json();
+    },
+
+    async getSellerEarnings(): Promise<any> {
+        const response = await fetch(`${API_BASE}/seller/earnings`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch seller earnings");
+        return response.json();
+    },
+
+    // Admin APIs
+    async getAdminSales(): Promise<{
+        total_sales: number;
+        total_revenue: number;
+        platform_revenue: number;
+        recent_sales: Array<{
+            id: number;
+            buyer_name: string;
+            seller_name: string;
+            model_name: string;
+            total: string;
+            platform_fee: string;
+            created_at: string;
+        }>;
+    }> {
+        const response = await fetch(`${API_BASE}/admin/sales`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch admin sales");
         return response.json();
     },
 };

@@ -79,7 +79,55 @@ function ldrawPlugin() {
                         }
                     }
 
-                    // If still not found, log and return 404
+                    // If still not found, try to find a fallback for patterned parts
+                    // Patterned parts have names like 3068bpb0064.dat or 3069bp01.dat
+                    // The base part is 3068b.dat or 3069b.dat
+                    const patternMatch = fileName.match(
+                        /^(\d+[a-z]*)p[bp]?\d+\.dat$/i,
+                    );
+                    if (patternMatch) {
+                        const basePart = `${patternMatch[1]}.dat`;
+                        const fallbackPath = join(
+                            publicDir,
+                            "ldraw",
+                            "parts",
+                            basePart,
+                        );
+                        if (existsSync(fallbackPath)) {
+                            try {
+                                console.warn(
+                                    `[LDraw] Pattern not found: ${fileName}, using base part: ${basePart}`,
+                                );
+                                let content = readFileSync(
+                                    fallbackPath,
+                                    "utf8",
+                                );
+
+                                // Strip UTF-8 BOM if present
+                                if (content.charCodeAt(0) === 0xfeff) {
+                                    content = content.slice(1);
+                                }
+
+                                res.setHeader(
+                                    "Content-Type",
+                                    "text/plain; charset=utf-8",
+                                );
+                                res.setHeader(
+                                    "Cache-Control",
+                                    "public, max-age=31536000",
+                                );
+                                res.end(content);
+                                return;
+                            } catch (err) {
+                                console.error(
+                                    `[LDraw] Error reading fallback ${fallbackPath}:`,
+                                    err,
+                                );
+                            }
+                        }
+                    }
+
+                    // If still not found after fallback attempt, log and return 404
                     console.warn(
                         `[LDraw] Missing file: ${url} (searched as ${fileName})`,
                     );

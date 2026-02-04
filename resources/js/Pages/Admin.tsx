@@ -20,7 +20,7 @@ interface Stats {
 }
 
 interface PaginatedUsers {
-    data: (User & { lego_models_count: number })[];
+    data: (User & { mocs_count: number })[];
     current_page: number;
     last_page: number;
     total: number;
@@ -292,7 +292,7 @@ export default function Admin() {
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-2 mb-6">
+                <div className="flex gap-2 mb-6 flex-wrap">
                     {["dashboard", "users", "models"].map((tab) => (
                         <button
                             key={tab}
@@ -308,6 +308,22 @@ export default function Admin() {
                             {tab.charAt(0).toUpperCase() + tab.slice(1)}
                         </button>
                     ))}
+
+                    {/* Links to separate admin pages */}
+                    <div className="ml-auto flex gap-2">
+                        <a
+                            href="/admin/sales"
+                            className="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        >
+                            💰 Sales
+                        </a>
+                        <a
+                            href="/admin/data-import"
+                            className="px-4 py-2 rounded-lg font-medium bg-green-600 text-white hover:bg-green-500 transition-colors"
+                        >
+                            📦 Data Import
+                        </a>
+                    </div>
                 </div>
 
                 {isLoading ? (
@@ -470,7 +486,7 @@ export default function Admin() {
                                                     </select>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-300">
-                                                    {u.lego_models_count}
+                                                    {u.mocs_count}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <button

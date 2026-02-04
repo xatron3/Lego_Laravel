@@ -37,7 +37,19 @@ class HandleInertiaRequests extends Middleware
   {
     return [
       ...parent::share($request),
-      //
+      'auth' => [
+        'user' => $request->user() ? [
+          'id' => $request->user()->id,
+          'name' => $request->user()->name,
+          'email' => $request->user()->email,
+          'role' => $request->user()->role,
+          'avatar' => $request->user()->avatar,
+          'created_at' => $request->user()->created_at?->toISOString(),
+        ] : null,
+      ],
+      'cart' => [
+        'count' => $request->user() ? $request->user()->cartItems()->count() : 0,
+      ],
     ];
   }
 }

@@ -1,34 +1,53 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
-import {
-    api,
-    CatalogSet,
-    CatalogPart,
-    CatalogMinifig,
-    CatalogColor,
-    CatalogTheme,
-    CatalogCategory,
-} from "../api";
+import { api } from "../api";
+import { catalogThemeUrl } from "../utils/seoUrls";
 
-type TabType = "sets" | "parts" | "minifigs" | "colors" | "themes";
+// Import shared components
+import SetCard from "../components/catalog/SetCard";
+import PartCard from "../components/catalog/PartCard";
+import MinifigCard from "../components/catalog/MinifigCard";
+import ColorCard from "../components/catalog/ColorCard";
+import LoadingGrid from "../components/catalog/LoadingGrid";
+import EmptyState from "../components/catalog/EmptyState";
+import Pagination from "../components/catalog/Pagination";
+import { usePagination } from "../hooks/usePagination";
 
-export default function Catalog() {
+type TabType = "sets" | "mocs" | "parts" | "minifigs" | "colors" | "themes";
+
+interface CatalogStats {
+    sets: number;
+    mocs: number;
+    parts: number;
+    minifigs: number;
+    colors: number;
+    themes: number;
+}
+
+interface CatalogProps {
+    initialStats?: CatalogStats;
+}
+
+/**
+ * Catalog page component - browse LEGO sets, parts, minifigs, colors, and themes
+ * Follows SRP by delegating tab content to specialized components
+ */
+export default function Catalog({ initialStats }: CatalogProps) {
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>("sets");
-
-    // Stats
-    const [stats, setStats] = useState({
-        sets: 0,
-        parts: 0,
-        minifigs: 0,
-        colors: 0,
-        themes: 0,
-    });
-
-    // Common filters
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [stats, setStats] = useState<CatalogStats>(
+        initialStats || {
+            sets: 0,
+            mocs: 0,
+            parts: 0,
+            minifigs: 0,
+            colors: 0,
+            themes: 0,
+        },
+    );
 
     // Debounce search
     useEffect(() => {
@@ -36,41 +55,39 @@ export default function Catalog() {
         return () => clearTimeout(timer);
     }, [search]);
 
-    // Load stats on mount
+    // Only fetch stats if not provided via props
     useEffect(() => {
-        api.getCatalogStats().then(setStats).catch(console.error);
-    }, []);
+        if (!initialStats) {
+            api.getCatalogStats().then(setStats).catch(console.error);
+        }
+    }, [initialStats]);
 
     const tabConfig = [
-        {
-            key: "sets" as TabType,
-            label: "Sets",
-            count: stats.sets,
-            icon: "🏗️",
-        },
+        { key: "sets" as TabType, label: "Sets", count: stats.sets, icon: "" },
+        { key: "mocs" as TabType, label: "MOCs", count: stats.mocs, icon: "🔨" },
         {
             key: "parts" as TabType,
             label: "Parts",
             count: stats.parts,
-            icon: "🧱",
+            icon: "",
         },
         {
             key: "minifigs" as TabType,
             label: "Minifigs",
             count: stats.minifigs,
-            icon: "🧑",
+            icon: "",
         },
         {
             key: "colors" as TabType,
             label: "Colors",
             count: stats.colors,
-            icon: "🎨",
+            icon: "",
         },
         {
             key: "themes" as TabType,
             label: "Themes",
             count: stats.themes,
-            icon: "📁",
+            icon: "",
         },
     ];
 
@@ -86,13 +103,13 @@ export default function Catalog() {
             />
 
             <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-white mb-2">
                         LEGO Catalog
                     </h1>
                     <p className="text-gray-400">
                         Browse through {stats.sets.toLocaleString()} sets,{" "}
+                        {stats.mocs.toLocaleString()} MOCs,{" "}
                         {stats.parts.toLocaleString()} parts, and{" "}
                         {stats.minifigs.toLocaleString()} minifigs
                     </p>
@@ -103,10 +120,7 @@ export default function Catalog() {
                     {tabConfig.map((tab) => (
                         <button
                             key={tab.key}
-                            onClick={() => {
-                                setActiveTab(tab.key);
-                                setSearch("");
-                            }}
+                            onClick={() => setActiveTab(tab.key)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                                 activeTab === tab.key
                                     ? "bg-yellow-500 text-gray-900"
@@ -115,14 +129,8 @@ export default function Catalog() {
                         >
                             <span>{tab.icon}</span>
                             <span>{tab.label}</span>
-                            <span
-                                className={`text-xs px-2 py-0.5 rounded-full ${
-                                    activeTab === tab.key
-                                        ? "bg-yellow-600"
-                                        : "bg-gray-700"
-                                }`}
-                            >
-                                {tab.count.toLocaleString()}
+                            <span className="text-sm opacity-75">
+                                ({tab.count.toLocaleString()})
                             </span>
                         </button>
                     ))}
@@ -139,7 +147,7 @@ export default function Catalog() {
                             className="w-full px-4 py-3 pl-12 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                         />
                         <svg
-                            className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                            className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -156,6 +164,7 @@ export default function Catalog() {
 
                 {/* Tab Content */}
                 {activeTab === "sets" && <SetsTab search={debouncedSearch} />}
+                {activeTab === "mocs" && <MocsTab search={debouncedSearch} />}
                 {activeTab === "parts" && <PartsTab search={debouncedSearch} />}
                 {activeTab === "minifigs" && (
                     <MinifigsTab search={debouncedSearch} />
@@ -171,21 +180,47 @@ export default function Catalog() {
     );
 }
 
-// ==================== Sets Tab ====================
+// ==================== Tab Components ====================
+// Simplified versions using shared components and hooks
+
 function SetsTab({ search }: { search: string }) {
-    const [sets, setSets] = useState<CatalogSet[]>([]);
+    const [sets, setSets] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [pagination, setPagination] = useState({ lastPage: 1, total: 0 });
-    const [themes, setThemes] = useState<CatalogTheme[]>([]);
-    const [selectedTheme, setSelectedTheme] = useState<number | null>(null);
+    const [themes, setThemes] = useState<any[]>([]);
     const [yearRange, setYearRange] = useState({ min: 1950, max: 2026 });
+    const [selectedTheme, setSelectedTheme] = useState<number | null>(null);
     const [yearFrom, setYearFrom] = useState<number | null>(null);
     const [yearTo, setYearTo] = useState<number | null>(null);
     const [sortBy, setSortBy] = useState("year");
     const [sortDir, setSortDir] = useState("desc");
+    const [imageLoadStatus, setImageLoadStatus] = useState<
+        Record<string, boolean>
+    >({});
+    const { page, setPage, pagination, setPagination } = usePagination([
+        search,
+        selectedTheme,
+        yearFrom,
+        yearTo,
+        sortBy,
+        sortDir,
+    ]);
 
-    // Load themes and year range
+    // Track image load success/failure
+    const handleImageLoad = (setNum: string, loaded: boolean) => {
+        setImageLoadStatus((prev) => ({ ...prev, [setNum]: loaded }));
+    };
+
+    // Sort sets with working images first
+    const sortedSets = [...sets].sort((a, b) => {
+        const aHasImage = imageLoadStatus[a.set_num] === true;
+        const bHasImage = imageLoadStatus[b.set_num] === true;
+
+        // Prioritize sets with images
+        if (aHasImage && !bHasImage) return -1;
+        if (!aHasImage && bHasImage) return 1;
+        return 0; // Keep original order for sets with same image status
+    });
+
     useEffect(() => {
         api.getCatalogThemes({ hierarchical: false })
             .then(setThemes)
@@ -193,7 +228,6 @@ function SetsTab({ search }: { search: string }) {
         api.getCatalogYearRange().then(setYearRange).catch(console.error);
     }, []);
 
-    // Load sets
     useEffect(() => {
         setIsLoading(true);
         api.getCatalogSets({
@@ -217,126 +251,85 @@ function SetsTab({ search }: { search: string }) {
             .finally(() => setIsLoading(false));
     }, [search, selectedTheme, yearFrom, yearTo, sortBy, sortDir, page]);
 
-    // Reset page when filters change
-    useEffect(() => {
-        setPage(1);
-    }, [search, selectedTheme, yearFrom, yearTo, sortBy, sortDir]);
-
     return (
         <div>
             {/* Filters */}
             <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-800 rounded-xl">
-                {/* Theme Filter */}
-                <div className="flex-1 min-w-[200px]">
-                    <label className="block text-gray-400 text-sm mb-1">
-                        Theme
-                    </label>
-                    <select
-                        value={selectedTheme || ""}
-                        onChange={(e) =>
-                            setSelectedTheme(
-                                e.target.value ? Number(e.target.value) : null,
-                            )
-                        }
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    >
-                        <option value="">All Themes</option>
-                        {themes.map((theme) => (
-                            <option key={theme.id} value={theme.id}>
-                                {theme.name} ({theme.sets_count})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Year Range */}
-                <div className="flex gap-2 items-end">
-                    <div>
-                        <label className="block text-gray-400 text-sm mb-1">
-                            From Year
-                        </label>
-                        <input
-                            type="number"
-                            value={yearFrom || ""}
-                            onChange={(e) =>
-                                setYearFrom(
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                )
-                            }
-                            placeholder={yearRange.min.toString()}
-                            min={yearRange.min}
-                            max={yearRange.max}
-                            className="w-24 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-gray-400 text-sm mb-1">
-                            To Year
-                        </label>
-                        <input
-                            type="number"
-                            value={yearTo || ""}
-                            onChange={(e) =>
-                                setYearTo(
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                )
-                            }
-                            placeholder={yearRange.max.toString()}
-                            min={yearRange.min}
-                            max={yearRange.max}
-                            className="w-24 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                        />
-                    </div>
-                </div>
-
-                {/* Sort */}
-                <div>
-                    <label className="block text-gray-400 text-sm mb-1">
-                        Sort By
-                    </label>
-                    <select
-                        value={`${sortBy}-${sortDir}`}
-                        onChange={(e) => {
-                            const [field, dir] = e.target.value.split("-");
-                            setSortBy(field);
-                            setSortDir(dir);
-                        }}
-                        className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    >
-                        <option value="year-desc">Newest First</option>
-                        <option value="year-asc">Oldest First</option>
-                        <option value="name-asc">Name A-Z</option>
-                        <option value="name-desc">Name Z-A</option>
-                        <option value="num_parts-desc">Most Parts</option>
-                        <option value="num_parts-asc">Fewest Parts</option>
-                    </select>
-                </div>
+                <select
+                    value={selectedTheme || ""}
+                    onChange={(e) =>
+                        setSelectedTheme(
+                            e.target.value ? Number(e.target.value) : null,
+                        )
+                    }
+                    className="flex-1 min-w-[200px] px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="">All Themes</option>
+                    {themes.map((t) => (
+                        <option key={t.id} value={t.id}>
+                            {t.name}
+                        </option>
+                    ))}
+                </select>
+                <input
+                    type="number"
+                    value={yearFrom || ""}
+                    onChange={(e) =>
+                        setYearFrom(
+                            e.target.value ? Number(e.target.value) : null,
+                        )
+                    }
+                    placeholder={`From (${yearRange.min})`}
+                    className="w-24 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+                <input
+                    type="number"
+                    value={yearTo || ""}
+                    onChange={(e) =>
+                        setYearTo(
+                            e.target.value ? Number(e.target.value) : null,
+                        )
+                    }
+                    placeholder={`To (${yearRange.max})`}
+                    className="w-24 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+                <select
+                    value={`${sortBy}-${sortDir}`}
+                    onChange={(e) => {
+                        const [s, d] = e.target.value.split("-");
+                        setSortBy(s);
+                        setSortDir(d);
+                    }}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="year-desc">Newest First</option>
+                    <option value="year-asc">Oldest First</option>
+                    <option value="num_parts-desc">Most Pieces</option>
+                    <option value="name-asc">Name A-Z</option>
+                </select>
             </div>
 
-            {/* Results Count */}
             <div className="text-gray-400 mb-4">
                 Showing {sets.length} of {pagination.total.toLocaleString()}{" "}
                 sets
             </div>
 
-            {/* Grid */}
             {isLoading ? (
                 <LoadingGrid count={24} />
             ) : sets.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {sets.map((set) => (
-                        <SetCard key={set.set_num} set={set} />
+                    {sortedSets.map((set) => (
+                        <SetCard
+                            key={set.set_num}
+                            set={set}
+                            onImageLoad={handleImageLoad}
+                        />
                     ))}
                 </div>
             ) : (
                 <EmptyState message="No sets found matching your criteria" />
             )}
 
-            {/* Pagination */}
             <Pagination
                 currentPage={page}
                 lastPage={pagination.lastPage}
@@ -346,26 +339,168 @@ function SetsTab({ search }: { search: string }) {
     );
 }
 
-// ==================== Parts Tab ====================
-function PartsTab({ search }: { search: string }) {
-    const [parts, setParts] = useState<CatalogPart[]>([]);
+function MocsTab({ search }: { search: string }) {
+    const [mocs, setMocs] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [pagination, setPagination] = useState({ lastPage: 1, total: 0 });
-    const [categories, setCategories] = useState<CatalogCategory[]>([]);
-    const [colors, setColors] = useState<CatalogColor[]>([]);
+    const [themes, setThemes] = useState<any[]>([]);
+    const [selectedTheme, setSelectedTheme] = useState<number | null>(null);
+    const [year, setYear] = useState<number | null>(null);
+    const [sortBy, setSortBy] = useState("year");
+    const [sortDir, setSortDir] = useState("desc");
+    const [imageLoadStatus, setImageLoadStatus] = useState<
+        Record<string, boolean>
+    >({});
+    const { page, setPage, pagination, setPagination } = usePagination([
+        search,
+        selectedTheme,
+        year,
+        sortBy,
+        sortDir,
+    ]);
+
+    // Track image load success/failure
+    const handleImageLoad = (setNum: string, loaded: boolean) => {
+        setImageLoadStatus((prev) => ({ ...prev, [setNum]: loaded }));
+    };
+
+    // Sort MOCs with working images first
+    const sortedMocs = [...mocs].sort((a, b) => {
+        const aHasImage = imageLoadStatus[a.set_num] === true;
+        const bHasImage = imageLoadStatus[b.set_num] === true;
+
+        // Prioritize MOCs with images
+        if (aHasImage && !bHasImage) return -1;
+        if (!aHasImage && bHasImage) return 1;
+        return 0; // Keep original order for MOCs with same image status
+    });
+
+    useEffect(() => {
+        api.getCatalogThemes({ hierarchical: false })
+            .then(setThemes)
+            .catch(console.error);
+    }, []);
+
+    useEffect(() => {
+        setIsLoading(true);
+        api.getCatalogMocs({
+            search: search || undefined,
+            theme_id: selectedTheme || undefined,
+            year: year || undefined,
+            sort: sortBy,
+            direction: sortDir,
+            page,
+            per_page: 24,
+        })
+            .then((result) => {
+                setMocs(result.data);
+                setPagination({
+                    lastPage: result.last_page,
+                    total: result.total,
+                });
+            })
+            .catch(console.error)
+            .finally(() => setIsLoading(false));
+    }, [search, selectedTheme, year, sortBy, sortDir, page]);
+
+    return (
+        <div>
+            {/* Filters */}
+            <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-800 rounded-xl">
+                <select
+                    value={selectedTheme || ""}
+                    onChange={(e) =>
+                        setSelectedTheme(
+                            e.target.value ? Number(e.target.value) : null,
+                        )
+                    }
+                    className="flex-1 min-w-50 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="">All Themes</option>
+                    {themes.map((t) => (
+                        <option key={t.id} value={t.id}>
+                            {t.name}
+                        </option>
+                    ))}
+                </select>
+                <input
+                    type="number"
+                    value={year || ""}
+                    onChange={(e) =>
+                        setYear(
+                            e.target.value ? Number(e.target.value) : null,
+                        )
+                    }
+                    placeholder="Year"
+                    className="w-24 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+                <select
+                    value={`${sortBy}-${sortDir}`}
+                    onChange={(e) => {
+                        const [s, d] = e.target.value.split("-");
+                        setSortBy(s);
+                        setSortDir(d);
+                    }}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="year-desc">Newest First</option>
+                    <option value="year-asc">Oldest First</option>
+                    <option value="num_parts-desc">Most Pieces</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="name-asc">Name A-Z</option>
+                </select>
+            </div>
+
+            <div className="text-gray-400 mb-4">
+                Showing {mocs.length} of {pagination.total.toLocaleString()}{" "}
+                MOCs
+            </div>
+
+            {isLoading ? (
+                <LoadingGrid count={24} />
+            ) : mocs.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {sortedMocs.map((moc) => (
+                        <SetCard
+                            key={moc.set_num}
+                            set={moc}
+                            onImageLoad={handleImageLoad}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <EmptyState message="No MOCs found matching your criteria" />
+            )}
+
+            <Pagination
+                currentPage={page}
+                lastPage={pagination.lastPage}
+                onPageChange={setPage}
+            />
+        </div>
+    );
+}
+
+function PartsTab({ search }: { search: string }) {
+    const [parts, setParts] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [colors, setColors] = useState<any[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<number | null>(
         null,
     );
     const [selectedColor, setSelectedColor] = useState<number>(0);
+    const { page, setPage, pagination, setPagination } = usePagination([
+        search,
+        selectedCategory,
+        selectedColor,
+    ]);
 
-    // Load categories and colors
     useEffect(() => {
         api.getCatalogCategories().then(setCategories).catch(console.error);
         api.getCatalogColors().then(setColors).catch(console.error);
     }, []);
 
-    // Load parts
     useEffect(() => {
         setIsLoading(true);
         api.getCatalogParts({
@@ -386,65 +521,44 @@ function PartsTab({ search }: { search: string }) {
             .finally(() => setIsLoading(false));
     }, [search, selectedCategory, selectedColor, page]);
 
-    useEffect(() => {
-        setPage(1);
-    }, [search, selectedCategory, selectedColor]);
-
     return (
         <div>
-            {/* Filters */}
             <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-800 rounded-xl">
-                {/* Category Filter */}
-                <div className="flex-1 min-w-[200px]">
-                    <label className="block text-gray-400 text-sm mb-1">
-                        Category
-                    </label>
-                    <select
-                        value={selectedCategory || ""}
-                        onChange={(e) =>
-                            setSelectedCategory(
-                                e.target.value ? Number(e.target.value) : null,
-                            )
-                        }
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    >
-                        <option value="">All Categories</option>
-                        {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                                {cat.name} ({cat.parts_count})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Color Filter */}
-                <div className="min-w-[200px]">
-                    <label className="block text-gray-400 text-sm mb-1">
-                        Display Color
-                    </label>
-                    <select
-                        value={selectedColor}
-                        onChange={(e) =>
-                            setSelectedColor(Number(e.target.value))
-                        }
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    >
-                        {colors.slice(0, 50).map((color) => (
-                            <option key={color.id} value={color.id}>
-                                {color.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                <select
+                    value={selectedCategory || ""}
+                    onChange={(e) =>
+                        setSelectedCategory(
+                            e.target.value ? Number(e.target.value) : null,
+                        )
+                    }
+                    className="flex-1 min-w-[200px] px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="">All Categories</option>
+                    {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                            {c.name}
+                        </option>
+                    ))}
+                </select>
+                <select
+                    value={selectedColor}
+                    onChange={(e) => setSelectedColor(Number(e.target.value))}
+                    className="min-w-[200px] px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="0">All Colors</option>
+                    {colors.map((c) => (
+                        <option key={c.id} value={c.id}>
+                            {c.name}
+                        </option>
+                    ))}
+                </select>
             </div>
 
-            {/* Results Count */}
             <div className="text-gray-400 mb-4">
                 Showing {parts.length} of {pagination.total.toLocaleString()}{" "}
                 parts
             </div>
 
-            {/* Grid */}
             {isLoading ? (
                 <LoadingGrid count={48} />
             ) : parts.length > 0 ? (
@@ -457,7 +571,6 @@ function PartsTab({ search }: { search: string }) {
                 <EmptyState message="No parts found matching your criteria" />
             )}
 
-            {/* Pagination */}
             <Pagination
                 currentPage={page}
                 lastPage={pagination.lastPage}
@@ -467,14 +580,16 @@ function PartsTab({ search }: { search: string }) {
     );
 }
 
-// ==================== Minifigs Tab ====================
 function MinifigsTab({ search }: { search: string }) {
-    const [minifigs, setMinifigs] = useState<CatalogMinifig[]>([]);
+    const [minifigs, setMinifigs] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [pagination, setPagination] = useState({ lastPage: 1, total: 0 });
     const [sortBy, setSortBy] = useState("name");
     const [sortDir, setSortDir] = useState("asc");
+    const { page, setPage, pagination, setPagination } = usePagination([
+        search,
+        sortBy,
+        sortDir,
+    ]);
 
     useEffect(() => {
         setIsLoading(true);
@@ -496,42 +611,29 @@ function MinifigsTab({ search }: { search: string }) {
             .finally(() => setIsLoading(false));
     }, [search, sortBy, sortDir, page]);
 
-    useEffect(() => {
-        setPage(1);
-    }, [search, sortBy, sortDir]);
-
     return (
         <div>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-800 rounded-xl">
-                <div>
-                    <label className="block text-gray-400 text-sm mb-1">
-                        Sort By
-                    </label>
-                    <select
-                        value={`${sortBy}-${sortDir}`}
-                        onChange={(e) => {
-                            const [field, dir] = e.target.value.split("-");
-                            setSortBy(field);
-                            setSortDir(dir);
-                        }}
-                        className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    >
-                        <option value="name-asc">Name A-Z</option>
-                        <option value="name-desc">Name Z-A</option>
-                        <option value="num_parts-desc">Most Parts</option>
-                        <option value="num_parts-asc">Fewest Parts</option>
-                    </select>
-                </div>
+            <div className="flex gap-4 mb-6 p-4 bg-gray-800 rounded-xl">
+                <select
+                    value={`${sortBy}-${sortDir}`}
+                    onChange={(e) => {
+                        const [s, d] = e.target.value.split("-");
+                        setSortBy(s);
+                        setSortDir(d);
+                    }}
+                    className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                    <option value="name-asc">Name A-Z</option>
+                    <option value="name-desc">Name Z-A</option>
+                    <option value="num_parts-desc">Most Parts</option>
+                </select>
             </div>
 
-            {/* Results Count */}
             <div className="text-gray-400 mb-4">
                 Showing {minifigs.length} of {pagination.total.toLocaleString()}{" "}
                 minifigs
             </div>
 
-            {/* Grid */}
             {isLoading ? (
                 <LoadingGrid count={48} />
             ) : minifigs.length > 0 ? (
@@ -544,7 +646,6 @@ function MinifigsTab({ search }: { search: string }) {
                 <EmptyState message="No minifigs found matching your criteria" />
             )}
 
-            {/* Pagination */}
             <Pagination
                 currentPage={page}
                 lastPage={pagination.lastPage}
@@ -554,9 +655,8 @@ function MinifigsTab({ search }: { search: string }) {
     );
 }
 
-// ==================== Colors Tab ====================
 function ColorsTab({ search }: { search: string }) {
-    const [colors, setColors] = useState<CatalogColor[]>([]);
+    const [colors, setColors] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showTrans, setShowTrans] = useState<boolean | null>(null);
 
@@ -571,57 +671,50 @@ function ColorsTab({ search }: { search: string }) {
             .finally(() => setIsLoading(false));
     }, [search, showTrans]);
 
-    const filteredColors = colors;
-
     return (
         <div>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-800 rounded-xl">
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowTrans(null)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                            showTrans === null
-                                ? "bg-yellow-500 text-gray-900"
-                                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
-                    >
-                        All
-                    </button>
-                    <button
-                        onClick={() => setShowTrans(false)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                            showTrans === false
-                                ? "bg-yellow-500 text-gray-900"
-                                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
-                    >
-                        Solid
-                    </button>
-                    <button
-                        onClick={() => setShowTrans(true)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                            showTrans === true
-                                ? "bg-yellow-500 text-gray-900"
-                                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
-                    >
-                        Transparent
-                    </button>
-                </div>
+            <div className="flex gap-2 mb-6 p-4 bg-gray-800 rounded-xl">
+                <button
+                    onClick={() => setShowTrans(null)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        showTrans === null
+                            ? "bg-yellow-500 text-gray-900"
+                            : "bg-gray-700 text-gray-300"
+                    }`}
+                >
+                    All
+                </button>
+                <button
+                    onClick={() => setShowTrans(false)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        showTrans === false
+                            ? "bg-yellow-500 text-gray-900"
+                            : "bg-gray-700 text-gray-300"
+                    }`}
+                >
+                    Solid
+                </button>
+                <button
+                    onClick={() => setShowTrans(true)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        showTrans === true
+                            ? "bg-yellow-500 text-gray-900"
+                            : "bg-gray-700 text-gray-300"
+                    }`}
+                >
+                    Transparent
+                </button>
             </div>
 
-            {/* Results Count */}
             <div className="text-gray-400 mb-4">
-                Showing {filteredColors.length} colors
+                Showing {colors.length} colors
             </div>
 
-            {/* Grid */}
             {isLoading ? (
                 <LoadingGrid count={48} />
-            ) : filteredColors.length > 0 ? (
+            ) : colors.length > 0 ? (
                 <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
-                    {filteredColors.map((color) => (
+                    {colors.map((color) => (
                         <ColorCard key={color.id} color={color} />
                     ))}
                 </div>
@@ -632,9 +725,8 @@ function ColorsTab({ search }: { search: string }) {
     );
 }
 
-// ==================== Themes Tab ====================
 function ThemesTab({ search }: { search: string }) {
-    const [themes, setThemes] = useState<CatalogTheme[]>([]);
+    const [themes, setThemes] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedThemes, setExpandedThemes] = useState<Set<number>>(
         new Set(),
@@ -644,7 +736,7 @@ function ThemesTab({ search }: { search: string }) {
         setIsLoading(true);
         api.getCatalogThemes({
             search: search || undefined,
-            hierarchical: !search, // Flat when searching
+            hierarchical: !search,
         })
             .then(setThemes)
             .catch(console.error)
@@ -654,47 +746,39 @@ function ThemesTab({ search }: { search: string }) {
     const toggleExpand = (id: number) => {
         setExpandedThemes((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
-                next.add(id);
-            }
+            next.has(id) ? next.delete(id) : next.add(id);
             return next;
         });
     };
 
-    const renderTheme = (theme: CatalogTheme, level = 0) => (
+    const renderTheme = (theme: any, level = 0): JSX.Element => (
         <div key={theme.id}>
             <div
-                className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-colors ${
-                    level > 0 ? "ml-" + Math.min(level * 6, 24) : ""
-                }`}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-colors"
                 style={{ marginLeft: level * 24 }}
             >
-                {theme.children && theme.children.length > 0 ? (
+                {theme.children?.length > 0 ? (
                     <button
                         onClick={() => toggleExpand(theme.id)}
-                        className="text-gray-400 w-5 hover:text-white"
+                        className="text-gray-400"
                     >
-                        {expandedThemes.has(theme.id) ? "▼" : "▶"}
+                        {expandedThemes.has(theme.id) ? "" : ""}
                     </button>
                 ) : (
                     <span className="w-5" />
                 )}
-                <a href={`/catalog/theme/${theme.id}`} className="flex-1 group">
-                    <span className="text-white font-medium group-hover:text-yellow-400 transition-colors">
+                <a href={catalogThemeUrl(theme)} className="flex-1 group">
+                    <div className="text-white group-hover:text-yellow-400">
                         {theme.name}
-                    </span>
-                    {theme.sets_count !== undefined && (
-                        <span className="text-gray-400 text-sm ml-2">
-                            ({theme.sets_count} sets)
-                        </span>
-                    )}
+                    </div>
+                    <div className="text-gray-400 text-sm">
+                        {theme.sets_count || 0} sets
+                    </div>
                 </a>
             </div>
             {theme.children && expandedThemes.has(theme.id) && (
                 <div>
-                    {theme.children.map((child) =>
+                    {theme.children.map((child: any) =>
                         renderTheme(child, level + 1),
                     )}
                 </div>
@@ -715,304 +799,6 @@ function ThemesTab({ search }: { search: string }) {
             ) : (
                 <EmptyState message="No themes found matching your criteria" />
             )}
-        </div>
-    );
-}
-
-// ==================== Card Components ====================
-
-function SetCard({ set }: { set: CatalogSet }) {
-    const [imgError, setImgError] = useState(false);
-
-    // Check if this is a MOC (set_num starts with 'MODEL-')
-    const isMoc = set.set_num.startsWith("MODEL-");
-    const mocSet = set as any; // Type assertion for MOC fields
-
-    return (
-        <a
-            href={`/catalog/set/${set.set_num}`}
-            className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-yellow-500 transition-colors group block"
-        >
-            <div className="aspect-square bg-gray-700 relative overflow-hidden">
-                {!imgError &&
-                    (isMoc && mocSet.thumbnail ? (
-                        <img
-                            src={`/storage/${mocSet.thumbnail}`}
-                            alt={set.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            onError={() => setImgError(true)}
-                            loading="lazy"
-                        />
-                    ) : !isMoc ? (
-                        <img
-                            src={set.image_url}
-                            alt={set.name}
-                            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
-                            onError={() => setImgError(true)}
-                            loading="lazy"
-                        />
-                    ) : null)}
-                {(imgError || (isMoc && !mocSet.thumbnail)) && (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500">
-                        <span className="text-4xl">{isMoc ? "🏗️" : "🏗️"}</span>
-                    </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                    <div className="text-yellow-400 text-xs font-mono">
-                        {set.set_num}
-                    </div>
-                    {isMoc && (
-                        <div className="text-green-400 text-xs font-bold">
-                            MOC
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className="p-3">
-                <h3
-                    className="text-white text-sm font-medium truncate"
-                    title={set.name}
-                >
-                    {set.name}
-                </h3>
-                <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
-                    <span>{set.year}</span>
-                    <span>{set.num_parts} pcs</span>
-                </div>
-                {set.theme && (
-                    <div className="text-xs text-gray-500 mt-1 truncate">
-                        {set.theme.name}
-                    </div>
-                )}
-            </div>
-        </a>
-    );
-}
-
-function PartCard({ part }: { part: CatalogPart }) {
-    const [imgError, setImgError] = useState(false);
-    const [photoError, setPhotoError] = useState(false);
-
-    // Determine which image to show
-    const imageUrl = !imgError
-        ? part.image_url
-        : !photoError && part.photo_url
-          ? part.photo_url
-          : null;
-
-    return (
-        <a
-            href={`/catalog/part/${part.part_num}`}
-            className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-yellow-500 transition-colors group block"
-        >
-            <div className="aspect-square bg-gray-700 relative overflow-hidden">
-                {imageUrl ? (
-                    <img
-                        src={imageUrl}
-                        alt={part.name}
-                        className="w-full h-full object-contain p-1 group-hover:scale-110 transition-transform"
-                        onError={() => {
-                            if (!imgError) {
-                                setImgError(true);
-                            } else {
-                                setPhotoError(true);
-                            }
-                        }}
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500">
-                        <span className="text-2xl">🧱</span>
-                    </div>
-                )}
-            </div>
-            <div className="p-2">
-                <div className="text-yellow-400 text-xs font-mono truncate">
-                    {part.part_num}
-                </div>
-                <div
-                    className="text-white text-xs truncate mt-0.5"
-                    title={part.name}
-                >
-                    {part.name}
-                </div>
-            </div>
-        </a>
-    );
-}
-
-function MinifigCard({ minifig }: { minifig: CatalogMinifig }) {
-    const [imgError, setImgError] = useState(false);
-
-    return (
-        <a
-            href={`/catalog/minifig/${minifig.fig_num}`}
-            className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-yellow-500 transition-colors group block"
-        >
-            <div className="aspect-square bg-gray-700 relative overflow-hidden">
-                {!imgError ? (
-                    <img
-                        src={minifig.image_url}
-                        alt={minifig.name}
-                        className="w-full h-full object-contain p-1 group-hover:scale-110 transition-transform"
-                        onError={() => setImgError(true)}
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500">
-                        <span className="text-2xl">🧑</span>
-                    </div>
-                )}
-            </div>
-            <div className="p-2">
-                <div className="text-yellow-400 text-xs font-mono truncate">
-                    {minifig.fig_num}
-                </div>
-                <div
-                    className="text-white text-xs truncate mt-0.5"
-                    title={minifig.name}
-                >
-                    {minifig.name}
-                </div>
-                <div className="text-gray-400 text-xs mt-0.5">
-                    {minifig.num_parts} parts
-                </div>
-            </div>
-        </a>
-    );
-}
-
-function ColorCard({ color }: { color: CatalogColor }) {
-    return (
-        <a
-            href={`/catalog/color/${color.id}`}
-            className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-yellow-500 transition-colors block"
-        >
-            <div
-                className="aspect-square relative"
-                style={{ backgroundColor: `#${color.rgb}` }}
-            >
-                {color.is_trans && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent" />
-                )}
-            </div>
-            <div className="p-2">
-                <div className="text-white text-xs truncate" title={color.name}>
-                    {color.name}
-                </div>
-                <div className="flex items-center justify-between text-xs mt-1">
-                    <span className="text-gray-400 font-mono">
-                        #{color.rgb}
-                    </span>
-                    {color.is_trans && (
-                        <span className="text-blue-400 text-xs">Trans</span>
-                    )}
-                </div>
-            </div>
-        </a>
-    );
-}
-
-// ==================== Utility Components ====================
-
-function LoadingGrid({ count }: { count: number }) {
-    return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {Array.from({ length: count }).map((_, i) => (
-                <div
-                    key={i}
-                    className="bg-gray-800 rounded-xl overflow-hidden animate-pulse"
-                >
-                    <div className="aspect-square bg-gray-700" />
-                    <div className="p-3 space-y-2">
-                        <div className="h-4 bg-gray-700 rounded w-3/4" />
-                        <div className="h-3 bg-gray-700 rounded w-1/2" />
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-function EmptyState({ message }: { message: string }) {
-    return (
-        <div className="text-center py-16">
-            <div className="text-6xl mb-4">🔍</div>
-            <p className="text-gray-400 text-lg">{message}</p>
-        </div>
-    );
-}
-
-function Pagination({
-    currentPage,
-    lastPage,
-    onPageChange,
-}: {
-    currentPage: number;
-    lastPage: number;
-    onPageChange: (page: number) => void;
-}) {
-    if (lastPage <= 1) return null;
-
-    const pages = [];
-    const showPages = 5;
-    let start = Math.max(1, currentPage - Math.floor(showPages / 2));
-    let end = Math.min(lastPage, start + showPages - 1);
-    start = Math.max(1, end - showPages + 1);
-
-    for (let i = start; i <= end; i++) {
-        pages.push(i);
-    }
-
-    return (
-        <div className="flex items-center justify-center gap-2 mt-8">
-            <button
-                onClick={() => onPageChange(1)}
-                disabled={currentPage === 1}
-                className="px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                ««
-            </button>
-            <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                «
-            </button>
-
-            {start > 1 && <span className="text-gray-400">...</span>}
-
-            {pages.map((page) => (
-                <button
-                    key={page}
-                    onClick={() => onPageChange(page)}
-                    className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-                        page === currentPage
-                            ? "bg-yellow-500 text-gray-900"
-                            : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                    }`}
-                >
-                    {page}
-                </button>
-            ))}
-
-            {end < lastPage && <span className="text-gray-400">...</span>}
-
-            <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === lastPage}
-                className="px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                »
-            </button>
-            <button
-                onClick={() => onPageChange(lastPage)}
-                disabled={currentPage === lastPage}
-                className="px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                »»
-            </button>
         </div>
     );
 }
