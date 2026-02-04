@@ -44,13 +44,14 @@ Route::get('lego-models/{id}', [LegoModelController::class, 'show']);
 Route::middleware('auth:sanctum')->group(function () {
   Route::get('my-models', [LegoModelController::class, 'myModels']);
   Route::post('lego-models', [LegoModelController::class, 'store']);
-  Route::put('lego-models/{legoModel}', [LegoModelController::class, 'update']);
-  Route::patch('lego-models/{legoModel}', [LegoModelController::class, 'update']);
-  Route::delete('lego-models/{legoModel}', [LegoModelController::class, 'destroy']);
+  Route::put('lego-models/{id}', [LegoModelController::class, 'update']);
+  Route::patch('lego-models/{id}', [LegoModelController::class, 'update']);
+  Route::delete('lego-models/{id}', [LegoModelController::class, 'destroy']);
 
   // Model ownership and claiming
-  Route::get('lego-models/{legoModel}/ownership', [LegoModelController::class, 'checkOwnership']);
-  Route::post('lego-models/{legoModel}/claim', [LegoModelController::class, 'claim']);
+  Route::get('lego-models/{id}/ownership', [LegoModelController::class, 'checkOwnership']);
+  Route::post('lego-models/{id}/claim', [LegoModelController::class, 'claim']);
+  Route::delete('lego-models/{id}/claim', [LegoModelController::class, 'unclaim']);
 
   // Dashboard routes
   Route::get('dashboard/models', [DashboardController::class, 'models']);

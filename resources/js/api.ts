@@ -224,6 +224,27 @@ export const api = {
         return response.json();
     },
 
+    // Unclaim a claimed model (remove from library)
+    async unclaimModel(
+        id: number,
+    ): Promise<{ message: string; owns: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/lego-models/${id}/claim`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to remove model");
+        }
+        return response.json();
+    },
+
     // Update user settings
     async updateSettings(data: {
         name?: string;

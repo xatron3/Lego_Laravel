@@ -14,6 +14,46 @@ interface UseSceneLoaderResult {
     loadingProgress: { loaded: number; total: number };
 }
 
+// Helper function to dispose of Three.js objects
+const disposeObject = (obj: any) => {
+    if (!obj) return;
+
+    // Dispose geometry
+    if (obj.geometry) {
+        obj.geometry.dispose();
+    }
+
+    // Dispose material(s)
+    if (obj.material) {
+        if (Array.isArray(obj.material)) {
+            obj.material.forEach((material: any) => {
+                if (material.map) material.map.dispose();
+                if (material.lightMap) material.lightMap.dispose();
+                if (material.bumpMap) material.bumpMap.dispose();
+                if (material.normalMap) material.normalMap.dispose();
+                if (material.specularMap) material.specularMap.dispose();
+                if (material.envMap) material.envMap.dispose();
+                material.dispose();
+            });
+        } else {
+            if (obj.material.map) obj.material.map.dispose();
+            if (obj.material.lightMap) obj.material.lightMap.dispose();
+            if (obj.material.bumpMap) obj.material.bumpMap.dispose();
+            if (obj.material.normalMap) obj.material.normalMap.dispose();
+            if (obj.material.specularMap) obj.material.specularMap.dispose();
+            if (obj.material.envMap) obj.material.envMap.dispose();
+            obj.material.dispose();
+        }
+    }
+
+    // Recursively dispose children
+    if (obj.children) {
+        for (let i = obj.children.length - 1; i >= 0; i--) {
+            disposeObject(obj.children[i]);
+        }
+    }
+};
+
 export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
     const [model, setModel] = useState<Group | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -27,11 +67,23 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
 
     useEffect(() => {
         if (!modelText) {
+            // Dispose old model before clearing
+            if (model) {
+                disposeObject(model);
+            }
             setModel(null);
             setMissingParts([]);
             setLoadingProgress({ loaded: 0, total: 0 });
             return;
         }
+
+        // Dispose old model before loading new one
+        setModel((prevModel) => {
+            if (prevModel) {
+                disposeObject(prevModel);
+            }
+            return null;
+        });
 
         setIsLoading(true);
         setError(null);
@@ -119,6 +171,15 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
                 setIsLoading(false);
             });
     }, [modelText]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (model) {
+                disposeObject(model);
+            }
+        };
+    }, [model]);
 
     return { model, error, isLoading, missingParts, loadingProgress };
 }

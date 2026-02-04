@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, router } from "@inertiajs/react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
-import UserMenu from "../components/UserMenu";
+import Header from "../components/Header";
 import { api, LegoModelData } from "../api";
 import { useModelLoader } from "../hooks/useModelLoader";
 
@@ -113,6 +113,22 @@ export default function Dashboard() {
         }
     };
 
+    const handleUnclaimModel = async (id: number) => {
+        if (
+            !confirm(
+                "Are you sure you want to remove this model from your library?",
+            )
+        )
+            return;
+        try {
+            await api.unclaimModel(id);
+            loadModels();
+        } catch (error: any) {
+            console.error("Failed to remove model:", error);
+            alert(error.message || "Failed to remove model");
+        }
+    };
+
     const handleSaveSettings = async () => {
         setIsSavingSettings(true);
         try {
@@ -153,46 +169,10 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-gray-900">
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <Link href="/" className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                                <svg
-                                    className="w-6 h-6 text-white"
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                </svg>
-                            </div>
-                            <span className="text-xl font-bold text-white">
-                                BrickVault
-                            </span>
-                        </Link>
+            <Header currentPage="dashboard" />
 
-                        <nav className="hidden md:flex items-center gap-8">
-                            <Link
-                                href="/store"
-                                className="text-gray-300 hover:text-white transition-colors"
-                            >
-                                Store
-                            </Link>
-                            <Link
-                                href="/viewer"
-                                className="text-gray-300 hover:text-white transition-colors"
-                            >
-                                Viewer
-                            </Link>
-                        </nav>
-
-                        <UserMenu />
-                    </div>
-                </div>
-            </header>
-
-            <div className="pt-16 flex">
+            {/* Main Content */}
+            <div className="pt-20 flex">
                 {/* Sidebar */}
                 <aside className="w-64 fixed left-0 top-16 bottom-0 bg-gray-800 border-r border-gray-700 p-4">
                     <div className="mb-6">
@@ -391,13 +371,13 @@ export default function Dashboard() {
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <Link
-                                                        href={`/viewer?model=${model.id}`}
+                                                        href={`/viewer/${model.id}`}
                                                         className="flex-1 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-medium text-center rounded-lg transition-colors"
                                                     >
                                                         View
                                                     </Link>
                                                     {model.user_id ===
-                                                        user?.id && (
+                                                    user?.id ? (
                                                         <button
                                                             onClick={() =>
                                                                 handleDeleteModel(
@@ -408,6 +388,21 @@ export default function Dashboard() {
                                                         >
                                                             Delete
                                                         </button>
+                                                    ) : (
+                                                        (model as any)
+                                                            .ownership_type ===
+                                                            "claimed" && (
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleUnclaimModel(
+                                                                        model.id!,
+                                                                    )
+                                                                }
+                                                                className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white font-medium rounded-lg transition-colors"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        )
                                                     )}
                                                 </div>
                                             </div>

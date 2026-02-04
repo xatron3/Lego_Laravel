@@ -4,7 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
-import UserMenu from "../components/UserMenu";
+import Header from "../components/Header";
 import Scene from "../Scene";
 import { api, LegoModelData } from "../api";
 
@@ -18,7 +18,9 @@ export default function ModelDetail({ id }: ModelDetailProps) {
     const [model, setModel] = useState<LegoModelData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddingToLibrary, setIsAddingToLibrary] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
     const [alreadyOwned, setAlreadyOwned] = useState(false);
+    const [ownershipType, setOwnershipType] = useState<string | null>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [loadError, setLoadError] = useState(false);
     const [loadingProgress, setLoadingProgress] = useState({
@@ -41,6 +43,7 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                 try {
                     const ownership = await api.checkOwnership(parseInt(id));
                     setAlreadyOwned(ownership.owns);
+                    setOwnershipType(ownership.type);
                 } catch (e) {
                     console.error("Failed to check ownership:", e);
                 }
@@ -63,11 +66,34 @@ export default function ModelDetail({ id }: ModelDetailProps) {
         try {
             await api.claimModel(parseInt(id));
             setAlreadyOwned(true);
+            setOwnershipType("claimed");
         } catch (error: any) {
             console.error("Failed to add to library:", error);
             alert(error.message || "Failed to add to library");
         } finally {
             setIsAddingToLibrary(false);
+        }
+    };
+
+    const handleRemoveFromLibrary = async () => {
+        if (
+            !confirm(
+                "Are you sure you want to remove this model from your library?",
+            )
+        ) {
+            return;
+        }
+
+        setIsRemoving(true);
+        try {
+            await api.unclaimModel(parseInt(id));
+            setAlreadyOwned(false);
+            setOwnershipType(null);
+        } catch (error: any) {
+            console.error("Failed to remove from library:", error);
+            alert(error.message || "Failed to remove from library");
+        } finally {
+            setIsRemoving(false);
         }
     };
 
@@ -82,55 +108,7 @@ export default function ModelDetail({ id }: ModelDetailProps) {
 
     return (
         <div className="min-h-screen bg-gray-900">
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <Link href="/" className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                                <svg
-                                    className="w-6 h-6 text-white"
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                </svg>
-                            </div>
-                            <span className="text-xl font-bold text-white">
-                                BrickVault
-                            </span>
-                        </Link>
-
-                        <nav className="hidden md:flex items-center gap-8">
-                            <Link
-                                href="/store"
-                                className="text-gray-300 hover:text-white transition-colors"
-                            >
-                                Store
-                            </Link>
-                            <Link
-                                href="/viewer"
-                                className="text-gray-300 hover:text-white transition-colors"
-                            >
-                                Viewer
-                            </Link>
-                        </nav>
-
-                        <div className="flex items-center gap-4">
-                            {isAuthenticated ? (
-                                <UserMenu />
-                            ) : (
-                                <button
-                                    onClick={() => setShowAuthModal(true)}
-                                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors"
-                                >
-                                    Sign In
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <Header currentPage="store" />
 
             {/* Main Content */}
             <main className="pt-20 pb-12">
@@ -354,6 +332,25 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                             <p className="text-green-400 text-center text-sm">
                                                 ✓ In your library
                                             </p>
+                                            {ownershipType === "claimed" &&
+                                                isFree && (
+                                                    <button
+                                                        onClick={
+                                                            handleRemoveFromLibrary
+                                                        }
+                                                        disabled={isRemoving}
+                                                        className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-red-400 font-medium rounded-lg transition-colors disabled:opacity-50 border border-gray-600"
+                                                    >
+                                                        {isRemoving ? (
+                                                            <span className="flex items-center justify-center gap-2">
+                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                                                                Removing...
+                                                            </span>
+                                                        ) : (
+                                                            "Remove from Library"
+                                                        )}
+                                                    </button>
+                                                )}
                                         </>
                                     ) : (
                                         <button

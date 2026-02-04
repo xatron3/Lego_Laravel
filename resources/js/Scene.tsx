@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
     Group,
     Object3D,
@@ -18,7 +18,7 @@ export default function Scene({
     dimPreviousSteps = true,
     previousStepsOpacity = 0.2,
     showCurrentStepBorder = false,
-    currentStepBorderColor = "#facc15",
+    currentStepBorderColor = "#ef4444",
     onMissingParts,
     onLoadingChange,
 }: {
@@ -38,12 +38,26 @@ export default function Scene({
     const { model, error, isLoading, missingParts, loadingProgress } =
         useSceneLoader(modelText);
     const [visibleModel, setVisibleModel] = useState<Group | null>(null);
-    const materialsCloned = useState(false);
+    const materialsCloned = useRef(false);
+    const bordersRef = useRef<LineSegments[]>([]);
 
     // Reset materials cloned state when model changes
     useEffect(() => {
-        materialsCloned[1](false);
-    }, [model, materialsCloned]);
+        materialsCloned.current = false;
+
+        // Cleanup borders from previous model
+        bordersRef.current.forEach((border) => {
+            if (border.geometry) border.geometry.dispose();
+            if (border.material) {
+                if (Array.isArray(border.material)) {
+                    border.material.forEach((m) => m.dispose());
+                } else {
+                    border.material.dispose();
+                }
+            }
+        });
+        bordersRef.current = [];
+    }, [model]);
 
     // Report missing parts to parent
     useEffect(() => {
@@ -61,7 +75,7 @@ export default function Scene({
 
     // Clone materials once when model loads so each part has its own material
     useEffect(() => {
-        if (!model || materialsCloned[0]) return;
+        if (!model || materialsCloned.current) return;
 
         // Clone materials recursively for EVERY mesh to ensure no sharing
         const cloneMaterialsRecursive = (obj: Object3D) => {
@@ -82,12 +96,12 @@ export default function Scene({
         };
 
         cloneMaterialsRecursive(model);
-        materialsCloned[1](true);
-    }, [model, materialsCloned]);
+        materialsCloned.current = true;
+    }, [model]);
 
     // Update visible object based on current step with ghost mode support
     useEffect(() => {
-        if (!model || !materialsCloned[0]) return;
+        if (!model || !materialsCloned.current) return;
 
         console.log(
             "=== Updating opacity for currentStep (0-based):",
@@ -127,23 +141,64 @@ export default function Scene({
         };
 
         // Remove all existing border lines from previous renders
-        const bordersToRemove: LineSegments[] = [];
-        model.traverse((child: Object3D) => {
-            if (child.userData.isBorder) {
-                bordersToRemove.push(child as LineSegments);
-            }
-        });
-        bordersToRemove.forEach((border) => {
+        bordersRef.current.forEach((border) => {
             border.parent?.remove(border);
             if (border.geometry) border.geometry.dispose();
             if (border.material) {
                 if (Array.isArray(border.material)) {
-                    border.material.forEach((m) => m.dispose());
+                    border.material.forEach((m: Material) => m.dispose());
                 } else {
                     border.material.dispose();
                 }
             }
         });
+        bordersRef.current = [];
+
+        let borderCount = 0;
+
+        // Recursive function to add borders to all meshes in current step
+        const addBordersToMeshes = (
+            obj: Object3D,
+            shouldAddBorder: boolean,
+        ) => {
+            // Add border to this mesh if it's a Mesh and we should add borders
+            if (shouldAddBorder && obj.type === "Mesh") {
+                const mesh = obj as Mesh;
+                if (mesh.geometry && mesh.geometry instanceof BufferGeometry) {
+                    try {
+                        const edges = new EdgesGeometry(
+                            mesh.geometry,
+                            89, // Very high threshold to only show outer silhouette, not studs
+                        );
+
+                        if (edges.attributes.position.count > 0) {
+                            const line = new LineSegments(
+                                edges,
+                                new LineBasicMaterial({
+                                    color: currentStepBorderColor,
+                                    transparent: false,
+                                    opacity: 1.0,
+                                    depthTest: true,
+                                    depthWrite: false,
+                                }),
+                            );
+                            line.userData.isBorder = true;
+                            line.renderOrder = 999; // Render on top
+                            mesh.add(line);
+                            bordersRef.current.push(line);
+                            borderCount++;
+                        }
+                    } catch (e) {
+                        console.warn("Failed to create edges for mesh:", e);
+                    }
+                }
+            }
+
+            // Recurse to children
+            obj.children.forEach((child) =>
+                addBordersToMeshes(child, shouldAddBorder),
+            );
+        };
 
         model.traverse((child: Object3D) => {
             if (child.userData.buildingStep !== undefined) {
@@ -160,30 +215,9 @@ export default function Scene({
                     child.visible = true;
                     targetOpacity = 1.0;
 
-                    // Add border if enabled
-                    if (showCurrentStepBorder && child instanceof Mesh) {
-                        const mesh = child as Mesh;
-                        if (mesh.geometry) {
-                            try {
-                                const edges = new EdgesGeometry(
-                                    mesh.geometry as BufferGeometry,
-                                    30,
-                                );
-                                const line = new LineSegments(
-                                    edges,
-                                    new LineBasicMaterial({
-                                        color: currentStepBorderColor,
-                                        linewidth: 3,
-                                        transparent: true,
-                                        opacity: 1.0,
-                                    }),
-                                );
-                                line.userData.isBorder = true;
-                                mesh.add(line);
-                            } catch (e) {
-                                // Silently fail if geometry doesn't support edges
-                            }
-                        }
+                    // Add borders to all meshes in this part
+                    if (showCurrentStepBorder) {
+                        addBordersToMeshes(child, true);
                     }
                 } else if (isPreviousStep) {
                     // Previous steps: use dimming if enabled, otherwise full opacity
@@ -206,6 +240,12 @@ export default function Scene({
             }
         });
 
+        if (showCurrentStepBorder) {
+            console.log(
+                `Added ${borderCount} borders to current step ${currentStep}`,
+            );
+        }
+
         setVisibleModel(model);
     }, [
         model,
@@ -215,7 +255,6 @@ export default function Scene({
         previousStepsOpacity,
         showCurrentStepBorder,
         currentStepBorderColor,
-        materialsCloned,
     ]);
 
     if (error)
