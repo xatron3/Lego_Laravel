@@ -224,9 +224,16 @@ export default function Admin() {
             if (response.ok) {
                 await fetchModels();
                 await fetchStats();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                const message = data.message || "Failed to delete model";
+                alert(message);
+                setError(message);
             }
-        } catch (err) {
-            setError("Failed to delete model");
+        } catch (err: any) {
+            const message = err?.message || "Failed to delete model";
+            alert(message);
+            setError(message);
         }
     };
 

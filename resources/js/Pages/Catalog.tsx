@@ -63,31 +63,41 @@ export default function Catalog({ initialStats }: CatalogProps) {
     }, [initialStats]);
 
     const tabConfig = [
-        { key: "sets" as TabType, label: "Sets", count: stats.sets, icon: "" },
-        { key: "mocs" as TabType, label: "MOCs", count: stats.mocs, icon: "🔨" },
+        {
+            key: "sets" as TabType,
+            label: "Sets",
+            count: stats.sets,
+            icon: "📦",
+        },
+        {
+            key: "mocs" as TabType,
+            label: "MOCs",
+            count: stats.mocs,
+            icon: "🔨",
+        },
         {
             key: "parts" as TabType,
             label: "Parts",
             count: stats.parts,
-            icon: "",
+            icon: "🧱",
         },
         {
             key: "minifigs" as TabType,
             label: "Minifigs",
             count: stats.minifigs,
-            icon: "",
+            icon: "🧑",
         },
         {
             key: "colors" as TabType,
             label: "Colors",
             count: stats.colors,
-            icon: "",
+            icon: "🎨",
         },
         {
             key: "themes" as TabType,
             label: "Themes",
             count: stats.themes,
-            icon: "",
+            icon: "🏷️",
         },
     ];
 
@@ -108,10 +118,10 @@ export default function Catalog({ initialStats }: CatalogProps) {
                         LEGO Catalog
                     </h1>
                     <p className="text-gray-400">
-                        Browse through {stats.sets.toLocaleString()} sets,{" "}
-                        {stats.mocs.toLocaleString()} MOCs,{" "}
-                        {stats.parts.toLocaleString()} parts, and{" "}
-                        {stats.minifigs.toLocaleString()} minifigs
+                        Browse through {stats.sets?.toLocaleString() || 0} sets,{" "}
+                        {stats.mocs?.toLocaleString() || 0} MOCs,{" "}
+                        {stats.parts?.toLocaleString() || 0} parts, and{" "}
+                        {stats.minifigs?.toLocaleString() || 0} minifigs
                     </p>
                 </div>
 
@@ -130,7 +140,7 @@ export default function Catalog({ initialStats }: CatalogProps) {
                             <span>{tab.icon}</span>
                             <span>{tab.label}</span>
                             <span className="text-sm opacity-75">
-                                ({tab.count.toLocaleString()})
+                                ({tab.count?.toLocaleString() || 0})
                             </span>
                         </button>
                     ))}
@@ -310,8 +320,8 @@ function SetsTab({ search }: { search: string }) {
             </div>
 
             <div className="text-gray-400 mb-4">
-                Showing {sets.length} of {pagination.total.toLocaleString()}{" "}
-                sets
+                Showing {sets.length} of{" "}
+                {pagination.total?.toLocaleString() || 0} sets
             </div>
 
             {isLoading ? (
@@ -426,9 +436,7 @@ function MocsTab({ search }: { search: string }) {
                     type="number"
                     value={year || ""}
                     onChange={(e) =>
-                        setYear(
-                            e.target.value ? Number(e.target.value) : null,
-                        )
+                        setYear(e.target.value ? Number(e.target.value) : null)
                     }
                     placeholder="Year"
                     className="w-24 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
@@ -452,8 +460,8 @@ function MocsTab({ search }: { search: string }) {
             </div>
 
             <div className="text-gray-400 mb-4">
-                Showing {mocs.length} of {pagination.total.toLocaleString()}{" "}
-                MOCs
+                Showing {mocs.length} of{" "}
+                {pagination.total?.toLocaleString() || 0} MOCs
             </div>
 
             {isLoading ? (
@@ -555,8 +563,8 @@ function PartsTab({ search }: { search: string }) {
             </div>
 
             <div className="text-gray-400 mb-4">
-                Showing {parts.length} of {pagination.total.toLocaleString()}{" "}
-                parts
+                Showing {parts.length} of{" "}
+                {pagination.total?.toLocaleString() || 0} parts
             </div>
 
             {isLoading ? (
@@ -630,8 +638,8 @@ function MinifigsTab({ search }: { search: string }) {
             </div>
 
             <div className="text-gray-400 mb-4">
-                Showing {minifigs.length} of {pagination.total.toLocaleString()}{" "}
-                minifigs
+                Showing {minifigs.length} of{" "}
+                {pagination.total?.toLocaleString() || 0} minifigs
             </div>
 
             {isLoading ? (

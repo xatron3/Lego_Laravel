@@ -8,18 +8,18 @@ interface SellerAnalytics {
         paid_earnings: number;
         total_sales: number;
     };
-    top_models: Array<{
-        model_id: number;
-        model_name: string;
-        model_thumbnail?: string;
-        model_price: number;
+    top_mocs: Array<{
+        moc_id: number;
+        moc_name: string;
+        moc_thumbnail?: string;
+        moc_price: number;
         sales_count: number;
         revenue: number;
     }>;
     recent_sales: Array<{
         id: number;
-        model_name: string;
-        model_thumbnail?: string;
+        moc_name: string;
+        moc_thumbnail?: string;
         buyer_name: string;
         amount: string;
         date: string;
@@ -214,24 +214,24 @@ export default function SalesAnalytics() {
                         >
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
-                        Top Selling Models
+                        Top Selling MOCs
                     </h2>
-                    {analytics.top_models.length === 0 ? (
+                    {analytics.top_mocs.length === 0 ? (
                         <p className="text-gray-500 text-center py-8">
                             No sales yet
                         </p>
                     ) : (
                         <div className="space-y-3">
-                            {analytics.top_models.map((model) => (
+                            {analytics.top_mocs.map((moc) => (
                                 <div
-                                    key={model.model_id}
+                                    key={moc.moc_id}
                                     className="flex items-center gap-4 bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors"
                                 >
                                     <div className="w-16 h-16 bg-gray-600 rounded-lg flex-shrink-0 overflow-hidden">
-                                        {model.model_thumbnail ? (
+                                        {moc.moc_thumbnail ? (
                                             <img
-                                                src={model.model_thumbnail}
-                                                alt={model.model_name}
+                                                src={moc.moc_thumbnail}
+                                                alt={moc.moc_name}
                                                 className="w-full h-full object-cover"
                                             />
                                         ) : (
@@ -248,15 +248,13 @@ export default function SalesAnalytics() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="text-white font-medium truncate">
-                                            {model.model_name}
+                                            {moc.moc_name}
                                         </h3>
                                         <div className="flex items-center gap-4 text-sm text-gray-400 mt-1">
-                                            <span>
-                                                {model.sales_count} sales
-                                            </span>
+                                            <span>{moc.sales_count} sales</span>
                                             <span>•</span>
                                             <span className="text-green-400 font-medium">
-                                                ${model.revenue.toFixed(2)}
+                                                ${moc.revenue.toFixed(2)}
                                             </span>
                                         </div>
                                     </div>
@@ -296,10 +294,10 @@ export default function SalesAnalytics() {
                                     className="flex items-center gap-4 bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors"
                                 >
                                     <div className="w-12 h-12 bg-gray-600 rounded-lg flex-shrink-0 overflow-hidden">
-                                        {sale.model_thumbnail ? (
+                                        {sale.moc_thumbnail ? (
                                             <img
-                                                src={sale.model_thumbnail}
-                                                alt={sale.model_name}
+                                                src={sale.moc_thumbnail}
+                                                alt={sale.moc_name}
                                                 className="w-full h-full object-cover"
                                             />
                                         ) : (
@@ -316,7 +314,7 @@ export default function SalesAnalytics() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="text-white text-sm font-medium truncate">
-                                            {sale.model_name}
+                                            {sale.moc_name}
                                         </h3>
                                         <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
                                             <span>by {sale.buyer_name}</span>

@@ -7,7 +7,7 @@ import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import Scene from "../Scene";
-import { api, LegoModelData, InventoryPartData } from "../api";
+import { api, LegoModelData, InventoryPartData, MocImageData } from "../api";
 
 interface ModelDetailProps {
     id: string;
@@ -30,6 +30,9 @@ export default function ModelDetail({ id }: ModelDetailProps) {
         loaded: 0,
         total: 0,
     });
+    // Image gallery state
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [showViewer, setShowViewer] = useState(false);
 
     useEffect(() => {
         loadModel();
@@ -178,10 +181,41 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                         {/* Header Section */}
                         <div className="bg-gray-800 rounded-2xl p-6 mb-6">
                             <div className="flex flex-col lg:flex-row gap-8">
-                                {/* 3D Preview */}
+                                {/* Image Gallery / 3D Preview */}
                                 <div className="lg:w-1/2">
-                                    <div className="aspect-square bg-gray-700 rounded-xl overflow-hidden relative">
-                                        {model.ldr_content ? (
+                                    {/* Main Image Display */}
+                                    <div className="aspect-square bg-gray-700 rounded-xl overflow-hidden relative mb-3">
+                                        {model.images &&
+                                        model.images.length > 0 &&
+                                        !showViewer ? (
+                                            // Show selected image from gallery
+                                            <img
+                                                src={
+                                                    model.images[
+                                                        selectedImageIndex
+                                                    ]?.url
+                                                }
+                                                alt={`${model.name} - Image ${selectedImageIndex + 1}`}
+                                                className="w-full h-full object-cover"
+                                                onError={() => {
+                                                    console.error(
+                                                        "Image failed to load:",
+                                                        model.images?.[
+                                                            selectedImageIndex
+                                                        ]?.url,
+                                                    );
+                                                    console.log(
+                                                        "Image data:",
+                                                        model.images?.[
+                                                            selectedImageIndex
+                                                        ],
+                                                    );
+                                                    // Fallback to 3D viewer on error
+                                                    setShowViewer(true);
+                                                }}
+                                            />
+                                        ) : model.ldr_content ? (
+                                            // Show 3D preview
                                             <Canvas
                                                 gl={{
                                                     preserveDrawingBuffer: true,
@@ -255,6 +289,71 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                                 </div>
                                             )}
                                     </div>
+
+                                    {/* Thumbnail Gallery */}
+                                    {((model.images &&
+                                        model.images.length > 0) ||
+                                        model.ldr_content) && (
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {/* Image thumbnails */}
+                                            {model.images?.map(
+                                                (image, index) => (
+                                                    <button
+                                                        key={image.id}
+                                                        onClick={() => {
+                                                            setSelectedImageIndex(
+                                                                index,
+                                                            );
+                                                            setShowViewer(
+                                                                false,
+                                                            );
+                                                        }}
+                                                        className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                                                            selectedImageIndex ===
+                                                                index &&
+                                                            !showViewer
+                                                                ? "border-yellow-500"
+                                                                : "border-transparent hover:border-gray-500"
+                                                        }`}
+                                                    >
+                                                        <img
+                                                            src={image.url}
+                                                            alt={`Thumbnail ${index + 1}`}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </button>
+                                                ),
+                                            )}
+                                            {/* 3D viewer toggle button */}
+                                            {model.ldr_content && (
+                                                <button
+                                                    onClick={() =>
+                                                        setShowViewer(true)
+                                                    }
+                                                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors flex items-center justify-center bg-gray-600 ${
+                                                        showViewer
+                                                            ? "border-yellow-500"
+                                                            : "border-transparent hover:border-gray-500"
+                                                    }`}
+                                                    title="3D Preview"
+                                                >
+                                                    <svg
+                                                        className="w-8 h-8 text-gray-300"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={1.5}
+                                                            d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Info */}

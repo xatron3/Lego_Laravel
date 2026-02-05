@@ -26,6 +26,18 @@ async function ensureCsrfCookie(): Promise<void> {
     });
 }
 
+// MOC Image data
+export interface MocImageData {
+    id: number;
+    moc_id: number;
+    path: string;
+    filename: string | null;
+    sort_order: number;
+    is_primary: boolean;
+    url: string;
+    created_at?: string;
+}
+
 export interface LegoModelData {
     id?: number;
     name: string;
@@ -38,10 +50,12 @@ export interface LegoModelData {
     is_public?: boolean;
     price?: number | string | null;
     thumbnail?: string | null;
+    display_thumbnail?: string | null;
     created_at?: string;
     set_num?: string;
     parts?: InventoryPartData[];
     parts_count?: number;
+    images?: MocImageData[];
     user?: {
         id: number;
         name: string;
@@ -211,7 +225,10 @@ export const api = {
             },
             credentials: "same-origin",
         });
-        if (!response.ok) throw new Error("Failed to delete model");
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.message || "Failed to delete model");
+        }
     },
 
     // Stats endpoint for homepage
@@ -354,6 +371,113 @@ export const api = {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.message || "Failed to upload thumbnail");
+        }
+        return response.json();
+    },
+
+    // ==================== MOC Image Management ====================
+
+    // Upload images for a MOC
+    async uploadMocImages(
+        mocId: number,
+        files: File[],
+    ): Promise<{ message: string; images: MocImageData[] }> {
+        await ensureCsrfCookie();
+        const formData = new FormData();
+        files.forEach((file) => {
+            formData.append("images[]", file);
+        });
+
+        const response = await fetch(`${API_BASE}/mocs/${mocId}/images`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: formData,
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to upload images");
+        }
+        return response.json();
+    },
+
+    // Delete an image from a MOC
+    async deleteMocImage(
+        mocId: number,
+        imageId: number,
+    ): Promise<{ message: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/mocs/${mocId}/images/${imageId}`,
+            {
+                method: "DELETE",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to delete image");
+        }
+        return response.json();
+    },
+
+    // Set primary image for a MOC
+    async setPrimaryMocImage(
+        mocId: number,
+        imageId: number,
+    ): Promise<{ message: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/mocs/${mocId}/images/${imageId}/primary`,
+            {
+                method: "PATCH",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to set primary image");
+        }
+        return response.json();
+    },
+
+    // Reorder images for a MOC
+    async reorderMocImages(
+        mocId: number,
+        imageIds: number[],
+    ): Promise<{ message: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/mocs/${mocId}/images/reorder`,
+            {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ image_ids: imageIds }),
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to reorder images");
         }
         return response.json();
     },
@@ -650,6 +774,43 @@ export const api = {
             credentials: "same-origin",
         });
         if (!response.ok) throw new Error("Failed to fetch set");
+        return response.json();
+    },
+
+    async getCatalogMocs(params?: {
+        search?: string;
+        theme_id?: number;
+        year?: number;
+        sort?: string;
+        direction?: string;
+        page?: number;
+        per_page?: number;
+    }): Promise<{
+        data: LegoModelData[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    }> {
+        const queryParams = new URLSearchParams();
+        if (params?.search) queryParams.set("search", params.search);
+        if (params?.theme_id)
+            queryParams.set("theme_id", params.theme_id.toString());
+        if (params?.year) queryParams.set("year", params.year.toString());
+        if (params?.sort) queryParams.set("sort", params.sort);
+        if (params?.direction) queryParams.set("direction", params.direction);
+        if (params?.page) queryParams.set("page", params.page.toString());
+        if (params?.per_page)
+            queryParams.set("per_page", params.per_page.toString());
+
+        const response = await fetch(
+            `${API_BASE}/catalog/mocs?${queryParams}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to fetch MOCs");
         return response.json();
     },
 
@@ -978,18 +1139,18 @@ export const api = {
             paid_earnings: number;
             total_sales: number;
         };
-        top_models: Array<{
-            model_id: number;
-            model_name: string;
-            model_thumbnail?: string;
-            model_price: number;
+        top_mocs: Array<{
+            moc_id: number;
+            moc_name: string;
+            moc_thumbnail?: string;
+            moc_price: number;
             sales_count: number;
             revenue: number;
         }>;
         recent_sales: Array<{
             id: number;
-            model_name: string;
-            model_thumbnail?: string;
+            moc_name: string;
+            moc_thumbnail?: string;
             buyer_name: string;
             amount: string;
             date: string;

@@ -17,9 +17,7 @@ export default function SetCard({ set, onImageLoad }: SetCardProps) {
     const mocSet = set as any; // Type assertion for MOC fields
 
     const primaryImage =
-        isMoc && mocSet.thumbnail
-            ? `/storage/${mocSet.thumbnail}`
-            : set.image_url;
+        isMoc && mocSet.thumbnail ? `${mocSet.thumbnail}` : set.image_url;
 
     const { imageUrl, hasError, handleError } = useImageFallback(primaryImage);
 

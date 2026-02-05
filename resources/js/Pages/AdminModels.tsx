@@ -119,9 +119,16 @@ export default function AdminModels() {
 
             if (response.ok) {
                 await fetchModels(models?.current_page, searchQuery);
+            } else {
+                const data = await response.json().catch(() => ({}));
+                const message = data.message || "Failed to delete model";
+                alert(message);
+                setError(message);
             }
-        } catch (err) {
-            setError("Failed to delete model");
+        } catch (err: any) {
+            const message = err?.message || "Failed to delete model";
+            alert(message);
+            setError(message);
         }
     };
 

@@ -22,7 +22,7 @@ class CatalogController extends Controller
     {
         return response()->json([
             'sets' => Set::official()->count(),
-            'mocs' => Moc::public()->count(),
+            'mocs' => Set::mocs()->count(),
             'parts' => Part::count(),
             'minifigs' => Minifig::count(),
             'colors' => Color::count(),
@@ -35,7 +35,7 @@ class CatalogController extends Controller
      */
     public function sets(Request $request): JsonResponse
     {
-        $query = Set::query()->with('theme');
+        $query = Set::query()->official()->with('theme');
 
         // Search by name or set number
         if ($search = $request->get('search')) {
@@ -661,9 +661,9 @@ class CatalogController extends Controller
      */
     public function mocs(Request $request): JsonResponse
     {
-        $query = Moc::query()
-            ->with(['set.theme', 'user:id,name', 'images'])
-            ->visibleTo($request->user());
+        $query = Set::query()
+            ->mocs()
+            ->with(['theme', 'moc.user:id,name', 'moc.images']);
 
         // Search by name or set number
         if ($search = $request->get('search')) {
@@ -673,39 +673,27 @@ class CatalogController extends Controller
             });
         }
 
-        // Filter by theme (through set relationship)
+        // Filter by theme
         if ($themeId = $request->get('theme_id')) {
             $themeIds = $this->getThemeWithChildren((int) $themeId);
-            $query->whereHas('set', function ($q) use ($themeIds) {
-                $q->whereIn('theme_id', $themeIds);
-            });
+            $query->whereIn('theme_id', $themeIds);
         }
 
-        // Filter by price range
-        if ($request->has('price_min')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('price', '>=', (float) $request->get('price_min'))
-                    ->orWhereNull('price'); // Include free MOCs
-            });
-        }
-
-        if ($request->has('price_max')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('price', '<=', (float) $request->get('price_max'))
-                    ->orWhereNull('price');
-            });
+        // Filter by year
+        if ($year = $request->get('year')) {
+            $query->where('year', (int) $year);
         }
 
         // Filter by min parts
         if ($minParts = $request->get('min_parts')) {
-            $query->where('total_parts', '>=', (int) $minParts);
+            $query->where('num_parts', '>=', (int) $minParts);
         }
 
         // Sorting
-        $sortBy = $request->get('sort', 'created_at');
+        $sortBy = $request->get('sort', 'year');
         $sortDir = $request->get('direction', 'desc');
 
-        $allowedSorts = ['name', 'total_parts', 'set_num', 'price', 'created_at'];
+        $allowedSorts = ['name', 'num_parts', 'set_num', 'year'];
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDir);
         }
@@ -713,6 +701,16 @@ class CatalogController extends Controller
         $perPage = min($request->get('per_page', 24), 100);
 
         $result = $query->paginate($perPage);
+
+        // Add display thumbnail from MOC images (primary image)
+        $result->getCollection()->transform(function ($set) {
+            if ($set->moc) {
+                $set->image_url = $set->moc->thumbnail;
+            } else {
+                $set->image_url = $this->getSetImageUrl($set->set_num);
+            }
+            return $set;
+        });
 
         return response()->json($result);
     }

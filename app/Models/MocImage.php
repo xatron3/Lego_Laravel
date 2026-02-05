@@ -26,6 +26,11 @@ class MocImage extends Model
   ];
 
   /**
+   * The accessors to append to the model's array form.
+   */
+  protected $appends = ['url'];
+
+  /**
    * Maximum number of images allowed per MOC.
    */
   public const MAX_IMAGES_PER_MOC = 8;
@@ -43,7 +48,12 @@ class MocImage extends Model
    */
   public function getUrlAttribute(): string
   {
-    return '/storage/' . $this->path;
+    // Remove 'storage/' prefix if it exists (shouldn't be in path)
+    $path = str_starts_with($this->path, 'storage/')
+      ? substr($this->path, 8)
+      : $this->path;
+
+    return '/storage/' . $path;
   }
 
   /**

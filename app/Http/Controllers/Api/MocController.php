@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Moc;
 use App\Models\MocImage;
+use App\Models\OrderItem;
 use App\Models\Set;
 use App\Models\Theme;
 use App\Models\Inventory;
@@ -17,656 +18,701 @@ use Illuminate\Support\Facades\Storage;
 
 class MocController extends Controller
 {
-    /**
-     * Display a listing of public MOCs.
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $query = Moc::with(['user:id,name', 'set.theme', 'images'])
-            ->visibleTo($request->user());
+  /**
+   * Display a listing of public MOCs.
+   */
+  public function index(Request $request): JsonResponse
+  {
+    $query = Moc::with(['user:id,name', 'set.theme', 'images'])
+      ->visibleTo($request->user());
 
-        // Filter by price type
-        $filter = $request->input('filter', 'all');
-        if ($filter === 'free') {
-            $query->where(function ($q) {
-                $q->whereNull('price')->orWhere('price', '<=', 0);
-            });
-        } elseif ($filter === 'paid') {
-            $query->where('price', '>', 0);
-        }
-
-        // Search by name or description
-        if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        // Sorting
-        $sort = $request->input('sort', 'newest');
-        switch ($sort) {
-            case 'oldest':
-                $query->oldest();
-                break;
-            case 'popular':
-                $query->latest(); // TODO: Add popularity tracking
-                break;
-            case 'price_low':
-                $query->orderByRaw('COALESCE(price, 0) ASC');
-                break;
-            case 'price_high':
-                $query->orderByRaw('COALESCE(price, 0) DESC');
-                break;
-            case 'name':
-                $query->orderBy('name');
-                break;
-            default:
-                $query->latest();
-        }
-
-        $perPage = min($request->input('per_page', 24), 100);
-        $mocs = $query->paginate($perPage);
-
-        // Transform to include display thumbnail
-        $mocs->getCollection()->transform(function ($moc) {
-            $moc->display_thumbnail = $moc->display_thumbnail;
-            return $moc;
-        });
-
-        return response()->json($mocs);
+    // Filter by price type
+    $filter = $request->input('filter', 'all');
+    if ($filter === 'free') {
+      $query->where(function ($q) {
+        $q->whereNull('price')->orWhere('price', '<=', 0);
+      });
+    } elseif ($filter === 'paid') {
+      $query->where('price', '>', 0);
     }
 
-    /**
-     * Get the authenticated user's MOCs.
-     */
-    public function myMocs(Request $request): JsonResponse
-    {
-        $mocs = Moc::with(['user:id,name', 'set.theme', 'images'])
-            ->where('user_id', $request->user()->id)
-            ->latest()
-            ->get();
-
-        $mocs->transform(function ($moc) {
-            $moc->display_thumbnail = $moc->display_thumbnail;
-            return $moc;
-        });
-
-        return response()->json($mocs);
+    // Search by name or description
+    if ($search = $request->input('search')) {
+      $query->where(function ($q) use ($search) {
+        $q->where('name', 'like', "%{$search}%")
+          ->orWhere('description', 'like', "%{$search}%");
+      });
     }
 
-    /**
-     * Check if user owns a MOC.
-     */
-    public function checkOwnership(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::findOrFail($id);
-        $user = $request->user();
-
-        $owns = false;
-        $type = null;
-
-        if ($moc->user_id === $user->id) {
-            $owns = true;
-            $type = 'creator';
-        } elseif ($user->ownsMoc($moc)) {
-            $owns = true;
-            $pivot = $user->ownedMocs()->where('moc_id', $moc->id)->first()?->pivot;
-            $type = $pivot?->type ?? 'owned';
-        }
-
-        return response()->json([
-            'owns' => $owns,
-            'type' => $type,
-        ]);
+    // Sorting
+    $sort = $request->input('sort', 'newest');
+    switch ($sort) {
+      case 'oldest':
+        $query->oldest();
+        break;
+      case 'popular':
+        $query->latest(); // TODO: Add popularity tracking
+        break;
+      case 'price_low':
+        $query->orderByRaw('COALESCE(price, 0) ASC');
+        break;
+      case 'price_high':
+        $query->orderByRaw('COALESCE(price, 0) DESC');
+        break;
+      case 'name':
+        $query->orderBy('name');
+        break;
+      default:
+        $query->latest();
     }
 
-    /**
-     * Claim a free MOC.
-     */
-    public function claim(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::findOrFail($id);
-        $user = $request->user();
+    $perPage = min($request->input('per_page', 24), 100);
+    $mocs = $query->paginate($perPage);
 
-        // Check if model is free
-        if (!$moc->isFree()) {
-            return response()->json(['message' => 'This MOC is not free. Please purchase it.'], 422);
-        }
+    // Transform to include display thumbnail
+    $mocs->getCollection()->transform(function ($moc) {
+      $moc->display_thumbnail = $moc->display_thumbnail;
+      return $moc;
+    });
 
-        // Check if already owned
-        if ($user->ownsMoc($moc)) {
-            return response()->json(['message' => 'You already own this MOC.'], 422);
-        }
+    return response()->json($mocs);
+  }
 
-        // Add to user's owned MOCs
-        $user->ownedMocs()->attach($moc->id, [
-            'type' => 'claimed',
-            'price_paid' => 0,
-        ]);
+  /**
+   * Get the authenticated user's MOCs.
+   */
+  public function myMocs(Request $request): JsonResponse
+  {
+    $mocs = Moc::with(['user:id,name', 'set.theme', 'images'])
+      ->where('user_id', $request->user()->id)
+      ->latest()
+      ->get();
 
-        return response()->json(['message' => 'MOC added to your library.']);
+    $mocs->transform(function ($moc) {
+      $moc->display_thumbnail = $moc->display_thumbnail;
+      return $moc;
+    });
+
+    return response()->json($mocs);
+  }
+
+  /**
+   * Check if user owns a MOC.
+   */
+  public function checkOwnership(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::findOrFail($id);
+    $user = $request->user();
+
+    $owns = false;
+    $type = null;
+
+    if ($moc->user_id === $user->id) {
+      $owns = true;
+      $type = 'creator';
+    } elseif ($user->ownsMoc($moc)) {
+      $owns = true;
+      $pivot = $user->ownedMocs()->where('moc_id', $moc->id)->first()?->pivot;
+      $type = $pivot?->type ?? 'owned';
     }
 
-    /**
-     * Remove a claimed MOC from library.
-     */
-    public function unclaim(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::findOrFail($id);
-        $user = $request->user();
+    return response()->json([
+      'owns' => $owns,
+      'type' => $type,
+    ]);
+  }
 
-        // Cannot unclaim if you're the creator
-        if ($moc->user_id === $user->id) {
-            return response()->json(['message' => 'Cannot unclaim your own MOC.'], 422);
-        }
+  /**
+   * Claim a free MOC.
+   */
+  public function claim(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::findOrFail($id);
+    $user = $request->user();
 
-        // Check if claimed (not purchased)
-        $pivot = $user->ownedMocs()->where('moc_id', $moc->id)->first()?->pivot;
-        if (!$pivot) {
-            return response()->json(['message' => 'You do not own this MOC.'], 422);
-        }
-
-        if ($pivot->type === 'purchased') {
-            return response()->json(['message' => 'Cannot remove purchased MOCs from library.'], 422);
-        }
-
-        $user->ownedMocs()->detach($moc->id);
-
-        return response()->json(['message' => 'MOC removed from your library.']);
+    // Check if model is free
+    if (!$moc->isFree()) {
+      return response()->json(['message' => 'This MOC is not free. Please purchase it.'], 422);
     }
 
-    /**
-     * Store a newly created MOC.
-     */
-    public function store(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'ldr_content' => 'required|string',
-            'file_name' => 'nullable|string|max:255',
-            'total_steps' => 'integer|min:0',
-            'is_public' => 'boolean',
-            'price' => 'nullable|numeric|min:0',
-            'thumbnail' => 'nullable|string',
-        ]);
-
-        // Get or create MOC theme
-        $mocTheme = $this->getOrCreateMocTheme();
-
-        // Generate unique set_num
-        $setNum = $this->generateSetNum();
-
-        DB::beginTransaction();
-        try {
-            // 1. Create Set record (catalog data)
-            $set = Set::create([
-                'set_num' => $setNum,
-                'name' => $validated['name'],
-                'year' => date('Y'),
-                'theme_id' => $mocTheme->id,
-                'num_parts' => 0,
-            ]);
-
-            // 2. Create MOC record (MOC-specific data)
-            $moc = Moc::create([
-                'name' => $validated['name'],
-                'description' => $validated['description'] ?? null,
-                'ldr_content' => $validated['ldr_content'],
-                'file_name' => $validated['file_name'] ?? null,
-                'total_steps' => $validated['total_steps'] ?? 0,
-                'total_parts' => 0,
-                'price' => $validated['price'] ?? null,
-                'is_public' => $validated['is_public'] ?? false,
-                'thumbnail' => $validated['thumbnail'] ?? null,
-                'user_id' => $request->user()->id,
-                'set_num' => $setNum,
-            ]);
-
-            // 3. Generate inventory from LDR content
-            $totalParts = $this->generateInventory($moc);
-
-            // 4. Update part counts
-            $set->update(['num_parts' => $totalParts]);
-            $moc->update(['total_parts' => $totalParts]);
-
-            DB::commit();
-
-            return response()->json($moc->load('user:id,name', 'set.theme', 'images'), 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Failed to create MOC: ' . $e->getMessage()], 500);
-        }
+    // Check if already owned
+    if ($user->ownsMoc($moc)) {
+      return response()->json(['message' => 'You already own this MOC.'], 422);
     }
 
-    /**
-     * Display the specified MOC.
-     */
-    public function show(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::with(['user:id,name', 'set.theme', 'images', 'inventories.parts.part.category', 'inventories.parts.color'])
-            ->findOrFail($id);
+    // Add to user's owned MOCs
+    $user->ownedMocs()->attach($moc->id, [
+      'type' => 'claimed',
+      'price_paid' => 0,
+    ]);
 
-        // Check access
-        if (!$moc->canBeAccessedBy($request->user())) {
-            return response()->json(['message' => 'MOC not found or access denied.'], 404);
-        }
+    return response()->json(['message' => 'MOC added to your library.']);
+  }
 
-        // Aggregate parts from inventories
-        $parts = $this->aggregateParts($moc);
-        $moc->parts = $parts;
-        $moc->parts_count = count($parts);
+  /**
+   * Remove a claimed MOC from library.
+   */
+  public function unclaim(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::findOrFail($id);
+    $user = $request->user();
 
-        // Add display thumbnail
-        $moc->display_thumbnail = $moc->display_thumbnail;
-
-        // Hide LDR content if user doesn't have access
-        if (!$moc->canAccessContent($request->user())) {
-            $moc->makeHidden('ldr_content');
-        } else {
-            $moc->makeVisible('ldr_content');
-        }
-
-        // Clean up loaded relations
-        unset($moc->inventories);
-
-        return response()->json($moc);
+    // Cannot unclaim if you're the creator
+    if ($moc->user_id === $user->id) {
+      return response()->json(['message' => 'Cannot unclaim your own MOC.'], 422);
     }
 
-    /**
-     * Update an existing MOC.
-     */
-    public function update(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::with('set')->findOrFail($id);
-
-        // Check ownership
-        if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
-
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'ldr_content' => 'sometimes|required|string',
-            'file_name' => 'nullable|string|max:255',
-            'total_steps' => 'integer|min:0',
-            'is_public' => 'boolean',
-            'price' => 'nullable|numeric|min:0',
-            'thumbnail' => 'nullable|string',
-        ]);
-
-        DB::beginTransaction();
-        try {
-            $ldrUpdated = isset($validated['ldr_content']) && $validated['ldr_content'] !== $moc->ldr_content;
-
-            // Update MOC
-            $moc->update($validated);
-
-            // Update Set name if changed
-            if (isset($validated['name']) && $moc->set) {
-                $moc->set->update(['name' => $validated['name']]);
-            }
-
-            // Regenerate inventory if LDR changed
-            if ($ldrUpdated) {
-                $totalParts = $this->generateInventory($moc, true);
-                $moc->update(['total_parts' => $totalParts]);
-                if ($moc->set) {
-                    $moc->set->update(['num_parts' => $totalParts]);
-                }
-            }
-
-            DB::commit();
-
-            return response()->json($moc->load('user:id,name', 'set.theme', 'images'));
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Failed to update MOC: ' . $e->getMessage()], 500);
-        }
+    // Check if claimed (not purchased)
+    $pivot = $user->ownedMocs()->where('moc_id', $moc->id)->first()?->pivot;
+    if (!$pivot) {
+      return response()->json(['message' => 'You do not own this MOC.'], 422);
     }
 
-    /**
-     * Delete a MOC.
-     */
-    public function destroy(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::with('set', 'images')->findOrFail($id);
-
-        if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
-
-        DB::beginTransaction();
-        try {
-            // Delete images (will also delete files via model event)
-            $moc->images()->delete();
-
-            // Delete inventory
-            if ($moc->set_num) {
-                $inventory = Inventory::where('set_num', $moc->set_num)->first();
-                if ($inventory) {
-                    InventoryPart::where('inventory_id', $inventory->id)->delete();
-                    $inventory->delete();
-                }
-            }
-
-            // Delete Set record
-            if ($moc->set) {
-                $moc->set->delete();
-            }
-
-            // Delete MOC
-            $moc->delete();
-
-            DB::commit();
-
-            return response()->json(['message' => 'MOC deleted successfully.']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Failed to delete MOC: ' . $e->getMessage()], 500);
-        }
+    if ($pivot->type === 'purchased') {
+      return response()->json(['message' => 'Cannot remove purchased MOCs from library.'], 422);
     }
 
-    /**
-     * Upload images for a MOC.
-     */
-    public function uploadImages(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::with('images')->findOrFail($id);
+    $user->ownedMocs()->detach($moc->id);
 
-        if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+    return response()->json(['message' => 'MOC removed from your library.']);
+  }
 
-        $request->validate([
-            'images' => 'required|array|min:1|max:' . MocImage::MAX_IMAGES_PER_MOC,
-            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max
-        ]);
+  /**
+   * Store a newly created MOC.
+   */
+  public function store(Request $request): JsonResponse
+  {
+    $validated = $request->validate([
+      'name' => 'required|string|max:255',
+      'description' => 'nullable|string',
+      'ldr_content' => 'required|string',
+      'file_name' => 'nullable|string|max:255',
+      'total_steps' => 'integer|min:0',
+      'is_public' => 'boolean',
+      'price' => 'nullable|numeric|min:0',
+      'thumbnail' => 'nullable|string',
+    ]);
 
-        // Check current image count
-        $currentCount = $moc->images()->count();
-        $newCount = count($request->file('images'));
+    // Get or create MOC theme
+    $mocTheme = $this->getOrCreateMocTheme();
 
-        if ($currentCount + $newCount > MocImage::MAX_IMAGES_PER_MOC) {
-            return response()->json([
-                'message' => "Maximum " . MocImage::MAX_IMAGES_PER_MOC . " images allowed. You have {$currentCount} and are trying to add {$newCount}."
-            ], 422);
-        }
+    // Generate unique set_num
+    $setNum = $this->generateSetNum();
 
-        $uploadedImages = [];
-        $nextSortOrder = $moc->images()->max('sort_order') + 1;
-        $isPrimary = $currentCount === 0; // First image becomes primary
+    DB::beginTransaction();
+    try {
+      // 1. Create Set record (catalog data)
+      $set = Set::create([
+        'set_num' => $setNum,
+        'name' => $validated['name'],
+        'year' => date('Y'),
+        'theme_id' => $mocTheme->id,
+        'num_parts' => 0,
+      ]);
 
-        foreach ($request->file('images') as $file) {
-            $path = $file->store('moc-images/' . $moc->id, 'public');
+      // 2. Create MOC record (MOC-specific data)
+      $moc = Moc::create([
+        'name' => $validated['name'],
+        'description' => $validated['description'] ?? null,
+        'ldr_content' => $validated['ldr_content'],
+        'file_name' => $validated['file_name'] ?? null,
+        'total_steps' => $validated['total_steps'] ?? 0,
+        'total_parts' => 0,
+        'price' => $validated['price'] ?? null,
+        'is_public' => $validated['is_public'] ?? false,
+        'thumbnail' => $validated['thumbnail'] ?? null,
+        'user_id' => $request->user()->id,
+        'set_num' => $setNum,
+      ]);
 
-            $image = MocImage::create([
-                'moc_id' => $moc->id,
-                'path' => $path,
-                'filename' => $file->getClientOriginalName(),
-                'sort_order' => $nextSortOrder++,
-                'is_primary' => $isPrimary,
-            ]);
+      // 3. Generate inventory from LDR content
+      $totalParts = $this->generateInventory($moc);
 
-            $isPrimary = false; // Only first is primary
-            $uploadedImages[] = $image;
-        }
+      // 4. Update part counts
+      $set->update(['num_parts' => $totalParts]);
+      $moc->update(['total_parts' => $totalParts]);
 
-        return response()->json([
-            'message' => 'Images uploaded successfully.',
-            'images' => $uploadedImages,
-        ]);
+      DB::commit();
+
+      return response()->json($moc->load('user:id,name', 'set.theme', 'images'), 201);
+    } catch (\Exception $e) {
+      DB::rollBack();
+      return response()->json(['message' => 'Failed to create MOC: ' . $e->getMessage()], 500);
+    }
+  }
+
+  /**
+   * Display the specified MOC.
+   */
+  public function show(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::with(['user:id,name', 'set.theme', 'images', 'inventories.parts.part.category', 'inventories.parts.color'])
+      ->findOrFail($id);
+
+    // Check access
+    if (!$moc->canBeAccessedBy($request->user())) {
+      return response()->json(['message' => 'MOC not found or access denied.'], 404);
     }
 
-    /**
-     * Delete an image from a MOC.
-     */
-    public function deleteImage(Request $request, string $id, string $imageId): JsonResponse
-    {
-        $moc = Moc::findOrFail($id);
+    // Aggregate parts from inventories
+    $parts = $this->aggregateParts($moc);
+    $moc->parts = $parts;
+    $moc->parts_count = count($parts);
 
-        if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+    // Add display thumbnail
+    $moc->display_thumbnail = $moc->display_thumbnail;
 
-        $image = MocImage::where('moc_id', $moc->id)->where('id', $imageId)->firstOrFail();
-
-        $wasPrimary = $image->is_primary;
-        $image->delete();
-
-        // If deleted image was primary, make another one primary
-        if ($wasPrimary) {
-            $nextImage = MocImage::where('moc_id', $moc->id)->orderBy('sort_order')->first();
-            if ($nextImage) {
-                $nextImage->update(['is_primary' => true]);
-            }
-        }
-
-        return response()->json(['message' => 'Image deleted successfully.']);
+    // Hide LDR content if user doesn't have access
+    if (!$moc->canAccessContent($request->user())) {
+      $moc->makeHidden('ldr_content');
+    } else {
+      $moc->makeVisible('ldr_content');
     }
 
-    /**
-     * Set primary image for a MOC.
-     */
-    public function setPrimaryImage(Request $request, string $id, string $imageId): JsonResponse
-    {
-        $moc = Moc::findOrFail($id);
+    // Clean up loaded relations
+    unset($moc->inventories);
 
-        if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+    return response()->json($moc);
+  }
+
+  /**
+   * Update an existing MOC.
+   */
+  public function update(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::with('set')->findOrFail($id);
+
+    // Check ownership
+    if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    $validated = $request->validate([
+      'name' => 'sometimes|required|string|max:255',
+      'description' => 'nullable|string',
+      'ldr_content' => 'sometimes|required|string',
+      'file_name' => 'nullable|string|max:255',
+      'total_steps' => 'integer|min:0',
+      'is_public' => 'boolean',
+      'price' => 'nullable|numeric|min:0',
+      'thumbnail' => 'nullable|string',
+    ]);
+
+    DB::beginTransaction();
+    try {
+      $ldrUpdated = isset($validated['ldr_content']) && $validated['ldr_content'] !== $moc->ldr_content;
+
+      // Update MOC
+      $moc->update($validated);
+
+      // Update Set name if changed
+      if (isset($validated['name']) && $moc->set) {
+        $moc->set->update(['name' => $validated['name']]);
+      }
+
+      // Regenerate inventory if LDR changed
+      if ($ldrUpdated) {
+        $totalParts = $this->generateInventory($moc, true);
+        $moc->update(['total_parts' => $totalParts]);
+        if ($moc->set) {
+          $moc->set->update(['num_parts' => $totalParts]);
         }
+      }
 
-        $image = MocImage::where('moc_id', $moc->id)->where('id', $imageId)->firstOrFail();
+      DB::commit();
 
-        // Remove primary from all other images
+      return response()->json($moc->load('user:id,name', 'set.theme', 'images'));
+    } catch (\Exception $e) {
+      DB::rollBack();
+      return response()->json(['message' => 'Failed to update MOC: ' . $e->getMessage()], 500);
+    }
+  }
+
+  /**
+   * Delete a MOC.
+   */
+  public function destroy(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::with('set', 'images')->findOrFail($id);
+
+    if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    // Check if MOC has been sold
+    $hasSales = OrderItem::where('moc_id', $moc->id)
+      ->whereHas('order', function ($query) {
+        $query->where('status', 'completed');
+      })
+      ->exists();
+
+    if ($hasSales && !$moc->isFree()) {
+      return response()->json([
+        'message' => 'Cannot delete this MOC because it has been sold. Customers have purchased this content and need continued access.'
+      ], 422);
+    }
+
+    DB::beginTransaction();
+    try {
+      // Delete images (will also delete files via model event)
+      $moc->images()->delete();
+
+      // Delete inventory
+      if ($moc->set_num) {
+        $inventory = Inventory::where('set_num', $moc->set_num)->first();
+        if ($inventory) {
+          InventoryPart::where('inventory_id', $inventory->id)->delete();
+          $inventory->delete();
+        }
+      }
+
+      // Delete Set record
+      if ($moc->set) {
+        $moc->set->delete();
+      }
+
+      // Delete MOC
+      $moc->delete();
+
+      DB::commit();
+
+      return response()->json(['message' => 'MOC deleted successfully.']);
+    } catch (\Exception $e) {
+      DB::rollBack();
+      return response()->json(['message' => 'Failed to delete MOC: ' . $e->getMessage()], 500);
+    }
+  }
+
+  /**
+   * Upload images for a MOC.
+   */
+  public function uploadImages(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::with('images', 'set')->findOrFail($id);
+
+    if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    $request->validate([
+      'images' => 'required|array|min:1|max:' . MocImage::MAX_IMAGES_PER_MOC,
+      'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max
+    ]);
+
+    // Check current image count
+    $currentCount = $moc->images()->count();
+    $newCount = count($request->file('images'));
+
+    if ($currentCount + $newCount > MocImage::MAX_IMAGES_PER_MOC) {
+      return response()->json([
+        'message' => "Maximum " . MocImage::MAX_IMAGES_PER_MOC . " images allowed. You have {$currentCount} and are trying to add {$newCount}."
+      ], 422);
+    }
+
+    $uploadedImages = [];
+    $nextSortOrder = $moc->images()->max('sort_order') + 1;
+    $isPrimary = $currentCount === 0; // First image becomes primary
+    $firstImagePath = null;
+
+    foreach ($request->file('images') as $file) {
+      $path = $file->store('moc-images/' . $moc->id, 'public');
+
+      // Remember the first uploaded image path for thumbnail
+      if ($firstImagePath === null) {
+        $firstImagePath = $path;
+      }
+
+      $image = MocImage::create([
+        'moc_id' => $moc->id,
+        'path' => $path,
+        'filename' => $file->getClientOriginalName(),
+        'sort_order' => $nextSortOrder++,
+        'is_primary' => $isPrimary,
+      ]);
+
+      $isPrimary = false; // Only first is primary
+      $uploadedImages[] = $image;
+    }
+
+    // Update MOC thumbnail if this is the first image upload
+    // This provides a fallback for rebrickable CDN
+    if ($currentCount === 0 && $firstImagePath) {
+      $moc->update(['thumbnail' => $firstImagePath]);
+    }
+
+    return response()->json([
+      'message' => 'Images uploaded successfully.',
+      'images' => $uploadedImages,
+    ]);
+  }
+
+  /**
+   * Delete an image from a MOC.
+   */
+  public function deleteImage(Request $request, string $id, string $imageId): JsonResponse
+  {
+    $moc = Moc::findOrFail($id);
+
+    if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    $image = MocImage::where('moc_id', $moc->id)->where('id', $imageId)->firstOrFail();
+
+    $wasPrimary = $image->is_primary;
+    $image->delete();
+
+    // If deleted image was primary, make another one primary and update thumbnail
+    if ($wasPrimary) {
+      $nextImage = MocImage::where('moc_id', $moc->id)->orderBy('sort_order')->first();
+      if ($nextImage) {
+        $nextImage->update(['is_primary' => true]);
+        $moc->update(['thumbnail' => $nextImage->path]);
+      } else {
+        // No more images, clear thumbnail
+        $moc->update(['thumbnail' => null]);
+      }
+    }
+
+    return response()->json(['message' => 'Image deleted successfully.']);
+  }
+
+  /**
+   * Set primary image for a MOC.
+   */
+  public function setPrimaryImage(Request $request, string $id, string $imageId): JsonResponse
+  {
+    $moc = Moc::findOrFail($id);
+
+    if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    $image = MocImage::where('moc_id', $moc->id)->where('id', $imageId)->firstOrFail();
+
+    // Remove primary from all other images
+    MocImage::where('moc_id', $moc->id)->update(['is_primary' => false]);
+
+    // Set this one as primary
+    $image->update(['is_primary' => true]);
+
+    // Update MOC thumbnail
+    $moc->update(['thumbnail' => $image->path]);
+
+    return response()->json(['message' => 'Primary image updated.']);
+  }
+
+  /**
+   * Reorder images for a MOC.
+   */
+  public function reorderImages(Request $request, string $id): JsonResponse
+  {
+    $moc = Moc::findOrFail($id);
+
+    if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
+      return response()->json(['message' => 'Unauthorized.'], 403);
+    }
+
+    $request->validate([
+      'image_ids' => 'required|array',
+      'image_ids.*' => 'required|integer|exists:moc_images,id',
+    ]);
+
+    $imageIds = $request->input('image_ids');
+
+    foreach ($imageIds as $index => $imageId) {
+      MocImage::where('id', $imageId)->where('moc_id', $moc->id)->update([
+        'sort_order' => $index,
+      ]);
+    }
+
+    // Update thumbnail to the first image in the new order
+    if (!empty($imageIds)) {
+      $firstImage = MocImage::find($imageIds[0]);
+      if ($firstImage) {
+        // Set first image as primary
         MocImage::where('moc_id', $moc->id)->update(['is_primary' => false]);
-
-        // Set this one as primary
-        $image->update(['is_primary' => true]);
-
-        return response()->json(['message' => 'Primary image updated.']);
+        $firstImage->update(['is_primary' => true]);
+        $moc->update(['thumbnail' => $firstImage->path]);
+      }
     }
 
-    /**
-     * Reorder images for a MOC.
-     */
-    public function reorderImages(Request $request, string $id): JsonResponse
-    {
-        $moc = Moc::findOrFail($id);
-
-        if ($moc->user_id !== $request->user()->id && !$request->user()->canModerate()) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
-
-        $request->validate([
-            'image_ids' => 'required|array',
-            'image_ids.*' => 'required|integer|exists:moc_images,id',
-        ]);
-
-        foreach ($request->input('image_ids') as $index => $imageId) {
-            MocImage::where('id', $imageId)->where('moc_id', $moc->id)->update([
-                'sort_order' => $index,
-            ]);
-        }
-
-        return response()->json(['message' => 'Images reordered successfully.']);
-    }
+    return response()->json(['message' => 'Images reordered successfully.']);
+  }
 
   // ==================== Helper Methods ====================
 
-    /**
-     * Get or create the MOC theme.
-     */
-    protected function getOrCreateMocTheme(): Theme
-    {
-        $mocTheme = Theme::where('name', 'My Own Creations (MOCs)')->first();
+  /**
+   * Get or create the MOC theme.
+   */
+  protected function getOrCreateMocTheme(): Theme
+  {
+    $mocTheme = Theme::where('name', 'My Own Creations (MOCs)')->first();
 
-        if (!$mocTheme) {
-            $maxId = Theme::max('id') ?? 0;
-            $mocTheme = Theme::create([
-                'id' => $maxId + 1,
-                'name' => 'My Own Creations (MOCs)',
-                'parent_id' => null,
-            ]);
-        }
-
-        return $mocTheme;
+    if (!$mocTheme) {
+      $maxId = Theme::max('id') ?? 0;
+      $mocTheme = Theme::create([
+        'id' => $maxId + 1,
+        'name' => 'My Own Creations (MOCs)',
+        'parent_id' => null,
+      ]);
     }
 
-    /**
-     * Generate a unique set_num for MOCs.
-     */
-    protected function generateSetNum(): string
-    {
-        $lastSet = Set::where('set_num', 'LIKE', 'MOC-%')
-            ->orderByRaw("CAST(SUBSTR(set_num, 5) AS INTEGER) DESC")
-            ->first();
+    return $mocTheme;
+  }
 
-        $nextNum = 1;
-        if ($lastSet) {
-            preg_match('/MOC-(\d+)/', $lastSet->set_num, $matches);
-            $nextNum = ((int) $matches[1]) + 1;
-        }
+  /**
+   * Generate a unique set_num for MOCs.
+   */
+  protected function generateSetNum(): string
+  {
+    $lastSet = Set::where('set_num', 'LIKE', 'MOC-%')
+      ->orderByRaw("CAST(SUBSTR(set_num, 5) AS INTEGER) DESC")
+      ->first();
 
-        return 'MOC-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+    $nextNum = 1;
+    if ($lastSet) {
+      preg_match('/MOC-(\d+)/', $lastSet->set_num, $matches);
+      $nextNum = ((int) $matches[1]) + 1;
     }
 
-    /**
-     * Generate inventory from LDR content.
-     */
-    protected function generateInventory(Moc $moc, bool $force = false): int
-    {
-        $existingInventory = Inventory::where('set_num', $moc->set_num)->first();
+    return 'MOC-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+  }
 
-        if ($existingInventory && !$force) {
-            return $moc->total_parts;
-        }
+  /**
+   * Generate inventory from LDR content.
+   */
+  protected function generateInventory(Moc $moc, bool $force = false): int
+  {
+    $existingInventory = Inventory::where('set_num', $moc->set_num)->first();
 
-        if ($existingInventory) {
-            InventoryPart::where('inventory_id', $existingInventory->id)->delete();
-            $existingInventory->delete();
-        }
-
-        if (empty($moc->ldr_content)) {
-            return 0;
-        }
-
-        $parts = $this->parseLdrFile($moc->ldr_content);
-
-        if (empty($parts)) {
-            return 0;
-        }
-
-        $nextId = (Inventory::max('id') ?? 0) + 1;
-        $inventory = Inventory::create([
-            'id' => $nextId,
-            'set_num' => $moc->set_num,
-            'version' => 1,
-        ]);
-
-        $createdParts = 0;
-        foreach ($parts as $partData) {
-            $part = Part::where('part_num', $partData['part_num'])->first();
-
-            if (!$part) {
-                continue;
-            }
-
-            $colorId = $partData['color_id'];
-            if ($colorId == 0) {
-                $colorId = 1;
-            }
-
-            if (!\App\Models\Color::where('id', $colorId)->exists()) {
-                $colorId = 1;
-            }
-
-            InventoryPart::create([
-                'inventory_id' => $inventory->id,
-                'part_num' => $partData['part_num'],
-                'color_id' => $colorId,
-                'quantity' => $partData['quantity'],
-                'is_spare' => false,
-            ]);
-
-            $createdParts += $partData['quantity'];
-        }
-
-        return $createdParts;
+    if ($existingInventory && !$force) {
+      return $moc->total_parts;
     }
 
-    /**
-     * Parse LDR file content.
-     */
-    protected function parseLdrFile(string $ldrContent): array
-    {
-        $lines = preg_split('/\r?\n/', $ldrContent);
-        $partCounts = [];
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if (preg_match('/^1\s+(\d+)\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+(.+\.dat)/i', $line, $matches)) {
-                $colorId = (int) $matches[1];
-                $partFile = $matches[2];
-
-                $partNum = preg_replace('/\.dat$/i', '', basename($partFile));
-
-                $key = $partNum . '_' . $colorId;
-
-                if (!isset($partCounts[$key])) {
-                    $partCounts[$key] = [
-                        'part_num' => $partNum,
-                        'color_id' => $colorId,
-                        'quantity' => 0,
-                    ];
-                }
-
-                $partCounts[$key]['quantity']++;
-            }
-        }
-
-        return array_values($partCounts);
+    if ($existingInventory) {
+      InventoryPart::where('inventory_id', $existingInventory->id)->delete();
+      $existingInventory->delete();
     }
 
-    /**
-     * Aggregate parts from inventories with image URLs.
-     */
-    protected function aggregateParts(Moc $moc): array
-    {
-        $partsMap = [];
+    if (empty($moc->ldr_content)) {
+      return 0;
+    }
 
-        foreach ($moc->inventories as $inventory) {
-            foreach ($inventory->parts as $invPart) {
-                $key = $invPart->part_num . '-' . $invPart->color_id;
+    $parts = $this->parseLdrFile($moc->ldr_content);
 
-                if (!isset($partsMap[$key])) {
-                    $element = $invPart->part?->elements()->where('color_id', $invPart->color_id)->first();
-                    $partsMap[$key] = [
-                        'part_num' => $invPart->part_num,
-                        'name' => $invPart->part?->name ?? 'Unknown',
-                        'category' => $invPart->part?->category?->name ?? 'Unknown',
-                        'color_id' => $invPart->color_id,
-                        'color_name' => $invPart->color?->name ?? 'Unknown',
-                        'color_rgb' => $invPart->color?->rgb ?? '000000',
-                        'quantity' => 0,
-                        'is_spare' => $invPart->is_spare,
-                        'image_url' => "https://cdn.rebrickable.com/media/parts/ldraw/{$invPart->color_id}/{$invPart->part_num}.png",
-                        'photo_url' => $element ? "https://cdn.rebrickable.com/media/parts/elements/{$element->element_id}.jpg" : null,
-                        'bricklink_url' => "https://www.bricklink.com/v2/catalog/catalogitem.page?P={$invPart->part_num}&C={$invPart->color_id}",
-                    ];
-                }
+    if (empty($parts)) {
+      return 0;
+    }
 
-                $partsMap[$key]['quantity'] += $invPart->quantity;
-            }
+    $nextId = (Inventory::max('id') ?? 0) + 1;
+    $inventory = Inventory::create([
+      'id' => $nextId,
+      'set_num' => $moc->set_num,
+      'version' => 1,
+    ]);
+
+    $createdParts = 0;
+    foreach ($parts as $partData) {
+      $part = Part::where('part_num', $partData['part_num'])->first();
+
+      if (!$part) {
+        continue;
+      }
+
+      $colorId = $partData['color_id'];
+      if ($colorId == 0) {
+        $colorId = 1;
+      }
+
+      if (!\App\Models\Color::where('id', $colorId)->exists()) {
+        $colorId = 1;
+      }
+
+      InventoryPart::create([
+        'inventory_id' => $inventory->id,
+        'part_num' => $partData['part_num'],
+        'color_id' => $colorId,
+        'quantity' => $partData['quantity'],
+        'is_spare' => false,
+      ]);
+
+      $createdParts += $partData['quantity'];
+    }
+
+    return $createdParts;
+  }
+
+  /**
+   * Parse LDR file content.
+   */
+  protected function parseLdrFile(string $ldrContent): array
+  {
+    $lines = preg_split('/\r?\n/', $ldrContent);
+    $partCounts = [];
+
+    foreach ($lines as $line) {
+      $line = trim($line);
+
+      if (preg_match('/^1\s+(\d+)\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+\s+(.+\.dat)/i', $line, $matches)) {
+        $colorId = (int) $matches[1];
+        $partFile = $matches[2];
+
+        $partNum = preg_replace('/\.dat$/i', '', basename($partFile));
+
+        $key = $partNum . '_' . $colorId;
+
+        if (!isset($partCounts[$key])) {
+          $partCounts[$key] = [
+            'part_num' => $partNum,
+            'color_id' => $colorId,
+            'quantity' => 0,
+          ];
         }
 
-        // Sort by quantity descending
-        $parts = array_values($partsMap);
-        usort($parts, fn($a, $b) => $b['quantity'] - $a['quantity']);
-
-        return $parts;
+        $partCounts[$key]['quantity']++;
+      }
     }
+
+    return array_values($partCounts);
+  }
+
+  /**
+   * Aggregate parts from inventories with image URLs.
+   */
+  protected function aggregateParts(Moc $moc): array
+  {
+    $partsMap = [];
+
+    foreach ($moc->inventories as $inventory) {
+      foreach ($inventory->parts as $invPart) {
+        $key = $invPart->part_num . '-' . $invPart->color_id;
+
+        if (!isset($partsMap[$key])) {
+          $element = $invPart->part?->elements()->where('color_id', $invPart->color_id)->first();
+          $partsMap[$key] = [
+            'part_num' => $invPart->part_num,
+            'name' => $invPart->part?->name ?? 'Unknown',
+            'category' => $invPart->part?->category?->name ?? 'Unknown',
+            'color_id' => $invPart->color_id,
+            'color_name' => $invPart->color?->name ?? 'Unknown',
+            'color_rgb' => $invPart->color?->rgb ?? '000000',
+            'quantity' => 0,
+            'is_spare' => $invPart->is_spare,
+            'image_url' => "https://cdn.rebrickable.com/media/parts/ldraw/{$invPart->color_id}/{$invPart->part_num}.png",
+            'photo_url' => $element ? "https://cdn.rebrickable.com/media/parts/elements/{$element->element_id}.jpg" : null,
+            'bricklink_url' => "https://www.bricklink.com/v2/catalog/catalogitem.page?P={$invPart->part_num}&C={$invPart->color_id}",
+          ];
+        }
+
+        $partsMap[$key]['quantity'] += $invPart->quantity;
+      }
+    }
+
+    // Sort by quantity descending
+    $parts = array_values($partsMap);
+    usort($parts, fn($a, $b) => $b['quantity'] - $a['quantity']);
+
+    return $parts;
+  }
 }

@@ -54,7 +54,16 @@ export default function SetDetail({ set }: SetDetailProps) {
                                     {set.set_num}
                                 </p>
                             </div>
-                            <BricklinkButton url={set.bricklink_url} />
+                            {set.set_num.startsWith("MOC-") ? (
+                                <a
+                                    href={`/models/${set.set_num}`}
+                                    className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                    View MOC Details
+                                </a>
+                            ) : (
+                                <BricklinkButton url={set.bricklink_url} />
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

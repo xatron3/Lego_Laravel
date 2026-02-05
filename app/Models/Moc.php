@@ -164,7 +164,17 @@ class Moc extends Model
    */
   public function getDisplayThumbnailAttribute(): ?string
   {
-    return $this->thumbnail;
+    if (!$this->thumbnail) {
+      return null;
+    }
+
+    // If thumbnail already has /storage/ prefix, return as-is (legacy data)
+    if (str_starts_with($this->thumbnail, '/storage/')) {
+      return $this->thumbnail;
+    }
+
+    // Add /storage/ prefix to path
+    return '/storage/' . $this->thumbnail;
   }
 
   // ==================== Helper Methods ====================

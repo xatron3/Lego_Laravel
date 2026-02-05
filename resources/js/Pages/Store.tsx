@@ -232,7 +232,7 @@ export default function Store({
                                     <div className="aspect-video bg-gray-700 relative overflow-hidden">
                                         {model.thumbnail ? (
                                             <img
-                                                src={`/storage/${model.thumbnail}`}
+                                                src={`${model.thumbnail}`}
                                                 alt={model.name}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                             />

@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Moc;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -168,6 +169,20 @@ class AdminController extends Controller
   public function deleteModel(string $id): JsonResponse
   {
     $moc = Moc::findOrFail($id);
+
+    // Check if MOC has been sold
+    $hasSales = OrderItem::where('moc_id', $moc->id)
+      ->whereHas('order', function ($query) {
+        $query->where('status', 'completed');
+      })
+      ->exists();
+
+    if ($hasSales && !$moc->isFree()) {
+      return response()->json([
+        'message' => 'Cannot delete this MOC because it has been sold. Customers have purchased this content and need continued access.'
+      ], 422);
+    }
+
     $moc->delete();
 
     return response()->json([

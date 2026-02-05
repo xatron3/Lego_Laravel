@@ -1,39 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { Link, router } from "@inertiajs/react";
+import { useState, useEffect } from "react";
+import { Link } from "@inertiajs/react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import SalesAnalytics from "../components/SalesAnalytics";
+import MocSubmitWizard from "../components/moc/MocSubmitWizard";
+import MocEditModal from "../components/moc/MocEditModal";
 import { api, LegoModelData } from "../api";
-import { useModelLoader } from "../hooks/useModelLoader";
 
 type TabType = "my-models" | "submit" | "settings" | "sales";
 type FilterType = "all" | "created" | "owned";
 
 export default function Dashboard() {
-    const { user, isAuthenticated, logout } = useAuth();
-    const { steps, modelText, loadFile, reset } = useModelLoader();
+    const { user, isAuthenticated } = useAuth();
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>("my-models");
     const [models, setModels] = useState<LegoModelData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState<FilterType>("all");
 
-    // Submit form state
-    const [modelName, setModelName] = useState("");
-    const [modelDescription, setModelDescription] = useState("");
-    const [modelIsPublic, setModelIsPublic] = useState(false);
-    const [modelPrice, setModelPrice] = useState("");
-    const [currentFileName, setCurrentFileName] = useState("");
-    const [isSaving, setIsSaving] = useState(false);
-    const [submitSuccess, setSubmitSuccess] = useState(false);
+    // Edit modal state
+    const [editingMoc, setEditingMoc] = useState<LegoModelData | null>(null);
 
     // Settings state
     const [settingsName, setSettingsName] = useState(user?.name || "");
     const [settingsEmail, setSettingsEmail] = useState(user?.email || "");
     const [isSavingSettings, setIsSavingSettings] = useState(false);
-
-    const isAdmin = user?.role === "admin";
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -60,49 +52,16 @@ export default function Dashboard() {
         }
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setCurrentFileName(file.name);
-        await loadFile(file);
-        setSubmitSuccess(false);
+    const handleMocSubmitSuccess = () => {
+        loadModels();
+        setActiveTab("my-models");
     };
 
-    const handleSubmitModel = async () => {
-        if (!modelText || !modelName.trim()) return;
-        setIsSaving(true);
-        try {
-            const totalParts = steps.reduce(
-                (sum, step) => sum + step.parts.length,
-                0,
-            );
-            await api.saveModel({
-                name: modelName.trim(),
-                description: modelDescription.trim() || undefined,
-                ldr_content: modelText,
-                file_name: currentFileName,
-                total_steps: steps.length,
-                total_parts: totalParts,
-                is_public: modelIsPublic,
-                price: modelPrice ? parseFloat(modelPrice) : null,
-            });
-            setSubmitSuccess(true);
-            setModelName("");
-            setModelDescription("");
-            setModelIsPublic(false);
-            setModelPrice("");
-            setCurrentFileName("");
-            reset();
-            // Refresh models list
-            if (activeTab === "my-models") {
-                loadModels();
-            }
-        } catch (error) {
-            console.error("Failed to save model:", error);
-            alert("Failed to save model");
-        } finally {
-            setIsSaving(false);
-        }
+    const handleMocEditSave = (updatedMoc: LegoModelData) => {
+        setModels((prev) =>
+            prev.map((m) => (m.id === updatedMoc.id ? updatedMoc : m)),
+        );
+        setEditingMoc(null);
     };
 
     const handleDeleteModel = async (id: number) => {
@@ -110,9 +69,10 @@ export default function Dashboard() {
         try {
             await api.deleteModel(id);
             loadModels();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to delete model:", error);
-            alert("Failed to delete model");
+            const message = error?.message || "Failed to delete model";
+            alert(message);
         }
     };
 
@@ -357,7 +317,7 @@ export default function Dashboard() {
                                                 <div className="aspect-video bg-gray-700 relative">
                                                     {model.thumbnail ? (
                                                         <img
-                                                            src={`/storage/${model.thumbnail}`}
+                                                            src={`${model.thumbnail}`}
                                                             alt={model.name}
                                                             className="w-full h-full object-cover"
                                                         />
@@ -411,16 +371,58 @@ export default function Dashboard() {
                                                         </Link>
                                                         {model.user_id ===
                                                         user?.id ? (
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleDeleteModel(
-                                                                        model.id!,
-                                                                    )
-                                                                }
-                                                                className="px-3 py-2 bg-red-500 hover:bg-red-400 text-white font-medium rounded-lg transition-colors"
-                                                            >
-                                                                Delete
-                                                            </button>
+                                                            <>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        setEditingMoc(
+                                                                            model,
+                                                                        )
+                                                                    }
+                                                                    className="px-3 py-2 bg-blue-500 hover:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+                                                                    title="Edit"
+                                                                >
+                                                                    <svg
+                                                                        className="w-5 h-5"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth={
+                                                                                2
+                                                                            }
+                                                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                                        />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleDeleteModel(
+                                                                            model.id!,
+                                                                        )
+                                                                    }
+                                                                    className="px-3 py-2 bg-red-500 hover:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                                                                    title="Delete"
+                                                                >
+                                                                    <svg
+                                                                        className="w-5 h-5"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth={
+                                                                                2
+                                                                            }
+                                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                                        />
+                                                                    </svg>
+                                                                </button>
+                                                            </>
                                                         ) : (
                                                             (model as any)
                                                                 .ownership_type ===
@@ -476,201 +478,10 @@ export default function Dashboard() {
 
                         {/* Submit Model Tab */}
                         {activeTab === "submit" && (
-                            <div className="max-w-2xl">
-                                <h1 className="text-2xl font-bold text-white mb-6">
-                                    Submit New Model
-                                </h1>
-
-                                {submitSuccess && (
-                                    <div className="mb-6 p-4 bg-green-500/20 border border-green-500 rounded-lg text-green-400">
-                                        Model submitted successfully! You can
-                                        view it in My Models.
-                                    </div>
-                                )}
-
-                                <div className="space-y-6">
-                                    {/* File Upload */}
-                                    <div>
-                                        <label className="block text-white font-medium mb-2">
-                                            LDraw File (.ldr, .mpd)
-                                        </label>
-                                        <div className="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-yellow-500 transition-colors">
-                                            <input
-                                                type="file"
-                                                accept=".ldr,.mpd"
-                                                onChange={handleFileUpload}
-                                                className="hidden"
-                                                id="file-upload"
-                                            />
-                                            <label
-                                                htmlFor="file-upload"
-                                                className="cursor-pointer"
-                                            >
-                                                {currentFileName ? (
-                                                    <div>
-                                                        <svg
-                                                            className="w-12 h-12 text-green-400 mx-auto mb-2"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M5 13l4 4L19 7"
-                                                            />
-                                                        </svg>
-                                                        <p className="text-white font-medium">
-                                                            {currentFileName}
-                                                        </p>
-                                                        <p className="text-gray-400 text-sm mt-1">
-                                                            {steps.length}{" "}
-                                                            steps,{" "}
-                                                            {steps.reduce(
-                                                                (sum, s) =>
-                                                                    sum +
-                                                                    s.parts
-                                                                        .length,
-                                                                0,
-                                                            )}{" "}
-                                                            parts
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <div>
-                                                        <svg
-                                                            className="w-12 h-12 text-gray-400 mx-auto mb-2"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                                            />
-                                                        </svg>
-                                                        <p className="text-gray-400">
-                                                            Click to upload or
-                                                            drag and drop
-                                                        </p>
-                                                        <p className="text-gray-500 text-sm mt-1">
-                                                            .ldr or .mpd files
-                                                            only
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Model Name */}
-                                    <div>
-                                        <label className="block text-white font-medium mb-2">
-                                            Model Name *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={modelName}
-                                            onChange={(e) =>
-                                                setModelName(e.target.value)
-                                            }
-                                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                            placeholder="Enter model name"
-                                        />
-                                    </div>
-
-                                    {/* Description */}
-                                    <div>
-                                        <label className="block text-white font-medium mb-2">
-                                            Description
-                                        </label>
-                                        <textarea
-                                            value={modelDescription}
-                                            onChange={(e) =>
-                                                setModelDescription(
-                                                    e.target.value,
-                                                )
-                                            }
-                                            rows={4}
-                                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
-                                            placeholder="Describe your model..."
-                                        />
-                                    </div>
-
-                                    {/* Visibility */}
-                                    <div>
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={modelIsPublic}
-                                                onChange={(e) =>
-                                                    setModelIsPublic(
-                                                        e.target.checked,
-                                                    )
-                                                }
-                                                className="w-5 h-5 rounded border-gray-600 text-yellow-500 focus:ring-yellow-500 bg-gray-700"
-                                            />
-                                            <span className="text-white">
-                                                Make this model public
-                                            </span>
-                                        </label>
-                                        <p className="text-gray-400 text-sm mt-1 ml-8">
-                                            Public models will be visible in the
-                                            store
-                                        </p>
-                                    </div>
-
-                                    {/* Price (only if public) */}
-                                    {modelIsPublic && (
-                                        <div>
-                                            <label className="block text-white font-medium mb-2">
-                                                Price (leave empty for free)
-                                            </label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                                    $
-                                                </span>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={modelPrice}
-                                                    onChange={(e) =>
-                                                        setModelPrice(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full px-4 py-3 pl-8 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Submit Button */}
-                                    <button
-                                        onClick={handleSubmitModel}
-                                        disabled={
-                                            !modelText ||
-                                            !modelName.trim() ||
-                                            isSaving
-                                        }
-                                        className="w-full px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold text-lg rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {isSaving ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-                                                Submitting...
-                                            </span>
-                                        ) : (
-                                            "Submit Model"
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
+                            <MocSubmitWizard
+                                onSuccess={handleMocSubmitSuccess}
+                                onCancel={() => setActiveTab("my-models")}
+                            />
                         )}
 
                         {/* Sales Tab */}
@@ -789,6 +600,16 @@ export default function Dashboard() {
                 isOpen={showAuthModal}
                 onClose={() => setShowAuthModal(false)}
             />
+
+            {/* Edit MOC Modal */}
+            {editingMoc && (
+                <MocEditModal
+                    moc={editingMoc}
+                    isOpen={true}
+                    onClose={() => setEditingMoc(null)}
+                    onSave={handleMocEditSave}
+                />
+            )}
         </div>
     );
 }
