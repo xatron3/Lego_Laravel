@@ -33,12 +33,6 @@ export default function Footer() {
                             >
                                 Viewer
                             </Link>
-                            <Link
-                                href="/flipping"
-                                className="text-gray-400 hover:text-yellow-400 transition-colors"
-                            >
-                                Flipping
-                            </Link>
                         </div>
                     </div>
                     <div>

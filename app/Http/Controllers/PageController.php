@@ -58,14 +58,14 @@ class PageController extends Controller
       ->where('year', '>=', now()->year - 5)
       ->orderBy('num_parts', 'desc')
       ->limit(6)
-      ->get(['set_num', 'name', 'year', 'theme_id', 'num_parts'])
+      ->get(['set_num', 'name', 'year', 'theme_id', 'num_parts', 'custom_image'])
       ->map(fn($set) => [
         'set_num' => $set->set_num,
         'name' => $set->name,
         'year' => $set->year,
         'num_parts' => $set->num_parts,
         'theme' => $set->theme?->name,
-        'image_url' => "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
+        'image_url' => $set->custom_image ? "/storage/{$set->custom_image}" : "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
       ]);
 
     // Get featured MOCs (latest public models with variety, limited to 6)

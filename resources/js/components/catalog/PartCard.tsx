@@ -45,6 +45,19 @@ export default function PartCard({ part }: PartCardProps) {
                 >
                     {part.name}
                 </div>
+                {part.filtered_color && (
+                    <div className="flex items-center gap-1 mt-1">
+                        <div
+                            className="w-3 h-3 rounded border border-gray-600 shrink-0"
+                            style={{
+                                backgroundColor: `#${part.filtered_color.rgb}`,
+                            }}
+                        />
+                        <span className="text-xs text-gray-400 truncate">
+                            {part.filtered_color.name}
+                        </span>
+                    </div>
+                )}
             </div>
         </a>
     );

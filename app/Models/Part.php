@@ -16,6 +16,7 @@ class Part extends Model
     'part_num',
     'name',
     'part_cat_id',
+    'custom_image',
   ];
 
   protected $casts = [

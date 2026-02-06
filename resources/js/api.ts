@@ -518,6 +518,201 @@ export const api = {
         return response.json();
     },
 
+    // ==================== Admin Catalog API ====================
+
+    async getAdminCatalogStats(): Promise<{
+        sets: number;
+        parts: number;
+        minifigs: number;
+        themes: number;
+        sets_with_custom_image: number;
+        parts_with_custom_image: number;
+        minifigs_with_custom_image: number;
+        themes_with_custom_image: number;
+    }> {
+        const response = await fetch(`${API_BASE}/admin/catalog/stats`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch catalog stats");
+        return response.json();
+    },
+
+    async getAdminCatalogRecords(
+        type: string,
+        params?: {
+            search?: string;
+            page?: number;
+            per_page?: number;
+            sort?: string;
+            direction?: string;
+        },
+    ): Promise<{
+        data: any[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    }> {
+        const searchParams = new URLSearchParams();
+        if (params?.search) searchParams.append("search", params.search);
+        if (params?.page) searchParams.append("page", params.page.toString());
+        if (params?.per_page)
+            searchParams.append("per_page", params.per_page.toString());
+        if (params?.sort) searchParams.append("sort", params.sort);
+        if (params?.direction)
+            searchParams.append("direction", params.direction);
+
+        const response = await fetch(
+            `${API_BASE}/admin/catalog/${type}?${searchParams.toString()}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to fetch records");
+        return response.json();
+    },
+
+    async getAdminCatalogRecord(type: string, id: string): Promise<any> {
+        const response = await fetch(
+            `${API_BASE}/admin/catalog/${type}/${id}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to fetch record");
+        return response.json();
+    },
+
+    async createAdminCatalogRecord(
+        type: string,
+        data: Record<string, any>,
+    ): Promise<{ message: string; data: any }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/admin/catalog/${type}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to create record");
+        }
+        return response.json();
+    },
+
+    async updateAdminCatalogRecord(
+        type: string,
+        id: string,
+        data: Record<string, any>,
+    ): Promise<{ message: string; data: any }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/admin/catalog/${type}/${id}`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+                body: JSON.stringify(data),
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to update record");
+        }
+        return response.json();
+    },
+
+    async deleteAdminCatalogRecord(
+        type: string,
+        id: string,
+    ): Promise<{ message: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/admin/catalog/${type}/${id}`,
+            {
+                method: "DELETE",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to delete");
+        }
+        return response.json();
+    },
+
+    async uploadAdminCatalogImage(
+        type: string,
+        id: string,
+        file: File,
+    ): Promise<{ message: string; image_url: string; custom_image: string }> {
+        await ensureCsrfCookie();
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const response = await fetch(
+            `${API_BASE}/admin/catalog/${type}/${id}/image`,
+            {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+                body: formData,
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to upload image");
+        }
+        return response.json();
+    },
+
+    async deleteAdminCatalogImage(
+        type: string,
+        id: string,
+    ): Promise<{ message: string; image_url: string }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/admin/catalog/${type}/${id}/image`,
+            {
+                method: "DELETE",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to delete image");
+        }
+        return response.json();
+    },
+
     // ==================== Admin Rebrickable API ====================
 
     async getRebrickableStats(): Promise<Record<string, number>> {
@@ -1529,6 +1724,12 @@ export interface CatalogPart {
     bricklink_url?: string;
     category?: CatalogCategory;
     available_colors?: CatalogPartColor[];
+    filtered_color?: {
+        id: number;
+        name: string;
+        rgb: string;
+        is_trans: boolean;
+    };
     // Detail view fields
     in_sets?: CatalogPartSet[];
     in_sets_count?: number;

@@ -15,6 +15,7 @@ class Minifig extends Model
     'fig_num',
     'name',
     'num_parts',
+    'custom_image',
   ];
 
   protected $casts = [

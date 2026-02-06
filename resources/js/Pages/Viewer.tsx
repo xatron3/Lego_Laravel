@@ -2,29 +2,23 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useModelLoader } from "../hooks/useModelLoader";
-import StepControls from "../components/StepControls";
-import StepPreview from "../components/StepPreview";
-import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
-import Footer from "../components/Footer";
+import CompactStepOverlay from "../components/CompactStepOverlay";
+import { PartDisplayItem } from "../components/PartsDisplay";
 import Scene from "../Scene";
 import { api, LegoModelData } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import ProUpgradePrompt from "../components/ProUpgradePrompt";
+import ViewerHelpModal from "../components/ViewerHelpModal";
 import { getPartsForStep } from "../parser";
-import {
-    captureCanvasScreenshot,
-    blobToBase64,
-    resizeImage,
-} from "../utils/screenshotCapture";
 
 interface ViewerProps {
     modelId?: string;
 }
 
 export default function Home({ modelId }: ViewerProps = {}) {
-    const { isAuthenticated, isPro } = useAuth();
+    const { isAuthenticated } = useAuth();
     const { steps, modelText, loadFile } = useModelLoader();
     const [currentStep, setCurrentStep] = useState(0);
     const [savedModels, setSavedModels] = useState<LegoModelData[]>([]);
@@ -41,9 +35,18 @@ export default function Home({ modelId }: ViewerProps = {}) {
         loaded: 0,
         total: 0,
     });
-    const [isSavingScreenshot, setIsSavingScreenshot] = useState(false);
     const [viewerBlocked, setViewerBlocked] = useState(false);
+    const [showHelpModal, setShowHelpModal] = useState(false);
+    const [partsListSize, setPartsListSize] = useState<
+        "small" | "medium" | "large"
+    >(() => {
+        const saved = localStorage.getItem("viewer-parts-size");
+        return (saved as "small" | "medium" | "large") || "medium";
+    });
+    const [hasScrollableContent, setHasScrollableContent] = useState(false);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
+    const orbitControlsRef = useRef<any>(null);
+    const partsScrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadSavedModels();
@@ -54,6 +57,11 @@ export default function Home({ modelId }: ViewerProps = {}) {
             loadModelById(parseInt(modelId));
         }
     }, [modelId]);
+
+    // Save parts list size to localStorage
+    useEffect(() => {
+        localStorage.setItem("viewer-parts-size", partsListSize);
+    }, [partsListSize]);
 
     const loadSavedModels = async () => {
         try {
@@ -104,54 +112,12 @@ export default function Home({ modelId }: ViewerProps = {}) {
     const handlePrevious = () => setCurrentStep((s) => Math.max(0, s - 1));
     const handleNext = () =>
         setCurrentStep((s) => Math.min(steps.length - 1, s + 1));
-    const handleStepClick = (step: number) => setCurrentStep(step);
     const handleLoadingChange = (
         isLoading: boolean,
         progress: { loaded: number; total: number },
     ) => {
         setIsLoadingModel(isLoading);
         setLoadingProgress(progress);
-    };
-
-    const handleSaveScreenshot = async () => {
-        if (!selectedModelId || !canvasContainerRef.current) {
-            alert("Please select a model first");
-            return;
-        }
-
-        try {
-            setIsSavingScreenshot(true);
-
-            // Find the canvas element
-            const canvas = canvasContainerRef.current.querySelector(
-                "canvas",
-            ) as HTMLCanvasElement;
-            if (!canvas) {
-                throw new Error("Canvas not found");
-            }
-
-            // Capture screenshot
-            const blob = await captureCanvasScreenshot(canvas, "png");
-
-            // Resize to reasonable thumbnail size
-            const resizedBlob = await resizeImage(blob, 800, 600);
-
-            // Convert to base64
-            const base64 = await blobToBase64(resizedBlob);
-
-            // Upload to server
-            await api.uploadThumbnail(parseInt(selectedModelId), base64);
-
-            alert("Screenshot saved successfully!");
-
-            // Reload models to show updated thumbnail
-            await loadSavedModels();
-        } catch (error) {
-            console.error("Failed to save screenshot:", error);
-            alert("Failed to save screenshot. Please try again.");
-        } finally {
-            setIsSavingScreenshot(false);
-        }
     };
 
     // Compute parts for current step with image URLs
@@ -172,31 +138,47 @@ export default function Home({ modelId }: ViewerProps = {}) {
         }));
     }, [steps, currentStep]);
 
-    // Compute all parts across all steps
-    const allParts = useMemo<PartDisplayItem[]>(() => {
-        if (steps.length === 0) return [];
+    // Check if parts list has scrollable content
+    useEffect(() => {
+        const checkScroll = () => {
+            if (partsScrollRef.current) {
+                const { scrollHeight, clientHeight } = partsScrollRef.current;
+                setHasScrollableContent(scrollHeight > clientHeight);
+            }
+        };
+        checkScroll();
+        // Recheck when parts or size changes
+        const timeoutId = setTimeout(checkScroll, 100);
+        return () => clearTimeout(timeoutId);
+    }, [currentStepParts, partsListSize]);
 
-        const partMap = new Map<string, PartDisplayItem>();
-        steps.forEach((step) => {
-            const partCounts = getPartsForStep(step);
-            partCounts.forEach((partCount) => {
-                const key = `${partCount.partId}_${partCount.colorId}`;
-                const existing = partMap.get(key);
-                if (existing) {
-                    existing.count += partCount.count;
-                } else {
-                    partMap.set(key, {
-                        partId: partCount.partId,
-                        colorId: partCount.colorId,
-                        count: partCount.count,
-                        imageUrl: `https://cdn.rebrickable.com/media/parts/ldraw/${partCount.colorId}/${partCount.partId}.png`,
-                        photoUrl: `https://cdn.rebrickable.com/media/parts/elements/${partCount.partId}.jpg`,
-                    });
-                }
-            });
-        });
-        return Array.from(partMap.values()).sort((a, b) => b.count - a.count);
-    }, [steps]);
+    // Calculate parts list dimensions based on size
+    const partsListConfig = useMemo(() => {
+        const configs = {
+            small: { cols: 2, gridClass: "grid-cols-2" },
+            medium: { cols: 3, gridClass: "grid-cols-3" },
+            large: { cols: 4, gridClass: "grid-cols-4" },
+        };
+        return configs[partsListSize];
+    }, [partsListSize]);
+
+    // Calculate dynamic height to fit all parts
+    const partsListHeight = useMemo(() => {
+        if (currentStepParts.length === 0) return "auto";
+        const cols = partsListConfig.cols;
+        const rows = Math.ceil(currentStepParts.length / cols);
+        // Each item: aspect-square (varies by col count) + text (40px) + padding (16px) + gap (8px)
+        // For better accuracy, account for actual rendered size
+        const itemHeight = 110; // Increased to account for image, text, and padding
+        const headerHeight = 48; // Header with title and buttons
+        const containerPadding = 16; // Top and bottom padding
+        const maxHeight = Math.min(window.innerHeight - 120, 700); // Max 700px or screen height - 120px
+        const calculatedHeight = Math.min(
+            rows * itemHeight + headerHeight + containerPadding,
+            maxHeight,
+        );
+        return `${calculatedHeight}px`;
+    }, [currentStepParts.length, partsListConfig.cols]);
 
     // Keyboard navigation for steps
     useEffect(() => {
@@ -232,6 +214,10 @@ export default function Home({ modelId }: ViewerProps = {}) {
             } else if (e.key === "d" || e.key === "D") {
                 // Toggle dimming with 'd' key
                 setDimPreviousSteps((prev) => !prev);
+            } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+                // Show help with '?' key
+                e.preventDefault();
+                setShowHelpModal(true);
             }
         };
 
@@ -246,12 +232,11 @@ export default function Home({ modelId }: ViewerProps = {}) {
                 currentPage="viewer"
             />
 
-            {/* Main Content - Full Screen Viewer */}
-            <div className="pt-20 h-screen flex overflow-hidden">
-                {/* 3D Viewer - Main Window */}
+            {/* Fullscreen Viewer */}
+            <div className="fixed inset-0 pt-18 bg-gray-900">
                 <div
                     ref={canvasContainerRef}
-                    className="flex-1 bg-gray-800 relative overflow-hidden"
+                    className="w-full h-full bg-gray-800 relative"
                 >
                     {viewerBlocked ? (
                         <div className="flex items-center justify-center h-full">
@@ -286,79 +271,280 @@ export default function Home({ modelId }: ViewerProps = {}) {
                         </div>
                     ) : (
                         <>
-                            {/* Screenshot Button */}
-                            {selectedModelId && isAuthenticated && (
-                                <div className="absolute top-4 right-4 z-10">
+                            {/* Help Button - Top Right */}
+                            <button
+                                onClick={() => setShowHelpModal(true)}
+                                className="absolute top-2 right-2 z-10 bg-gray-900/80 hover:bg-gray-900 text-white p-3 rounded-lg shadow-lg border border-gray-700 transition-colors"
+                                title="Help & Keyboard Shortcuts (?)"
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
+                                </svg>
+                            </button>
+
+                            {/* Model Selector & Parts - Top Left */}
+                            <div className="absolute top-2 left-2 z-10 w-96 max-w-[calc(100vw-1rem)] space-y-2">
+                                <select
+                                    value={selectedModelId}
+                                    onChange={handleModelSelect}
+                                    className="w-full bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-lg"
+                                >
+                                    <option value="">
+                                        {savedModels.length === 0
+                                            ? "No models available"
+                                            : "Choose a model..."}
+                                    </option>
+                                    {savedModels.map((model) => (
+                                        <option key={model.id} value={model.id}>
+                                            {model.name} ({model.total_steps}{" "}
+                                            steps)
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {/* Parts List - Resizable */}
+                                {steps.length > 0 &&
+                                    currentStepParts.length > 0 && (
+                                        <div
+                                            className="bg-gray-900/95 backdrop-blur-md rounded-lg shadow-lg border border-gray-700/50 overflow-hidden transition-all duration-300"
+                                            style={{
+                                                height: partsListHeight,
+                                            }}
+                                        >
+                                            <div className="flex items-center justify-between p-2 border-b border-gray-700/50 bg-gray-900/50">
+                                                <h3 className="text-xs font-semibold text-yellow-400">
+                                                    Parts • Step{" "}
+                                                    {currentStep + 1} •{" "}
+                                                    <span className="text-gray-400">
+                                                        {
+                                                            currentStepParts.length
+                                                        }{" "}
+                                                        piece
+                                                        {currentStepParts.length !==
+                                                        1
+                                                            ? "s"
+                                                            : ""}
+                                                    </span>
+                                                </h3>
+                                                {/* Size Toggle */}
+                                                <div className="flex gap-1 bg-gray-800 rounded p-0.5">
+                                                    <button
+                                                        onClick={() =>
+                                                            setPartsListSize(
+                                                                "small",
+                                                            )
+                                                        }
+                                                        className={`px-2.5 py-1 text-xs font-medium rounded transition-all ${
+                                                            partsListSize ===
+                                                            "small"
+                                                                ? "bg-yellow-400 text-gray-900 shadow-sm"
+                                                                : "text-gray-400 hover:text-white hover:bg-gray-700"
+                                                        }`}
+                                                        title="Small - 2 columns"
+                                                    >
+                                                        2×
+                                                    </button>
+                                                    <button
+                                                        onClick={() =>
+                                                            setPartsListSize(
+                                                                "medium",
+                                                            )
+                                                        }
+                                                        className={`px-2.5 py-1 text-xs font-medium rounded transition-all ${
+                                                            partsListSize ===
+                                                            "medium"
+                                                                ? "bg-yellow-400 text-gray-900 shadow-sm"
+                                                                : "text-gray-400 hover:text-white hover:bg-gray-700"
+                                                        }`}
+                                                        title="Medium - 3 columns"
+                                                    >
+                                                        3×
+                                                    </button>
+                                                    <button
+                                                        onClick={() =>
+                                                            setPartsListSize(
+                                                                "large",
+                                                            )
+                                                        }
+                                                        className={`px-2.5 py-1 text-xs font-medium rounded transition-all ${
+                                                            partsListSize ===
+                                                            "large"
+                                                                ? "bg-yellow-400 text-gray-900 shadow-sm"
+                                                                : "text-gray-400 hover:text-white hover:bg-gray-700"
+                                                        }`}
+                                                        title="Large - 4 columns"
+                                                    >
+                                                        4×
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div
+                                                ref={partsScrollRef}
+                                                className="overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent scroll-smooth"
+                                                style={{
+                                                    height: "calc(100% - 48px)",
+                                                }}
+                                            >
+                                                <div className="p-3">
+                                                    <div
+                                                        className={`grid ${partsListConfig.gridClass} gap-2.5`}
+                                                    >
+                                                        {currentStepParts.map(
+                                                            (part, idx) => (
+                                                                <div
+                                                                    key={`${part.partId}-${part.colorId}-${idx}`}
+                                                                    className="bg-gray-800 rounded-lg p-2.5 hover:bg-gray-750 transition-all hover:shadow-lg hover:scale-105"
+                                                                >
+                                                                    <div className="relative aspect-square bg-gray-700 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+                                                                        {part.imageUrl ? (
+                                                                            <img
+                                                                                src={
+                                                                                    part.imageUrl
+                                                                                }
+                                                                                alt={
+                                                                                    part.partId
+                                                                                }
+                                                                                className="max-w-full max-h-full object-contain p-2"
+                                                                                loading="lazy"
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-2xl">
+                                                                                🧱
+                                                                            </span>
+                                                                        )}
+                                                                        {/* Quantity Badge */}
+                                                                        <div className="absolute top-1 right-1 bg-yellow-400 text-gray-900 px-1.5 py-0.5 rounded-full text-xs font-bold shadow-md">
+                                                                            ×
+                                                                            {
+                                                                                part.count
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                    <div
+                                                                        className="text-xs text-gray-400 font-mono truncate text-center"
+                                                                        title={
+                                                                            part.partId
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            part.partId
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Scroll indicator */}
+                                            {hasScrollableContent && (
+                                                <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-gray-900/95 to-transparent pointer-events-none flex items-end justify-center pb-1">
+                                                    <div className="text-xs text-gray-500 animate-bounce">
+                                                        ↓
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                            </div>
+
+                            {/* Large Step Navigation Buttons */}
+                            {steps.length > 0 && (
+                                <>
+                                    {/* Previous Button */}
                                     <button
-                                        onClick={handleSaveScreenshot}
-                                        disabled={isSavingScreenshot}
-                                        className="bg-gray-900/80 hover:bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg border border-gray-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Save Screenshot as Thumbnail"
+                                        onClick={handlePrevious}
+                                        disabled={currentStep === 0}
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-gray-900/90 hover:bg-yellow-400 hover:text-gray-900 text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-900/90 disabled:hover:text-white p-4 rounded-full shadow-2xl border border-gray-700 hover:border-yellow-400 transition-all group"
+                                        title="Previous Step (← or ↑)"
                                     >
-                                        {isSavingScreenshot ? (
-                                            <>
-                                                <svg
-                                                    className="animate-spin h-5 w-5"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <circle
-                                                        className="opacity-25"
-                                                        cx="12"
-                                                        cy="12"
-                                                        r="10"
-                                                        stroke="currentColor"
-                                                        strokeWidth="4"
-                                                    ></circle>
-                                                    <path
-                                                        className="opacity-75"
-                                                        fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                                    ></path>
-                                                </svg>
-                                                <span>Saving...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg
-                                                    className="w-5 h-5"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                                                    />
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                                                    />
-                                                </svg>
-                                                <span>Screenshot</span>
-                                            </>
-                                        )}
+                                        <svg
+                                            className="w-8 h-8"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={3}
+                                                d="M15 19l-7-7 7-7"
+                                            />
+                                        </svg>
                                     </button>
-                                </div>
+
+                                    {/* Next Button */}
+                                    <button
+                                        onClick={handleNext}
+                                        disabled={
+                                            currentStep === steps.length - 1
+                                        }
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-gray-900/90 hover:bg-yellow-400 hover:text-gray-900 text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-900/90 disabled:hover:text-white p-4 rounded-full shadow-2xl border border-gray-700 hover:border-yellow-400 transition-all group"
+                                        title="Next Step (→ or ↓)"
+                                    >
+                                        <svg
+                                            className="w-8 h-8"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={3}
+                                                d="M9 5l7 7-7 7"
+                                            />
+                                        </svg>
+                                    </button>
+                                </>
                             )}
 
-                            {/* Parts List Overlay */}
-                            {currentStepParts.length > 0 && (
-                                <div className="absolute top-4 left-4 w-96">
-                                    <PartsDisplay
-                                        parts={currentStepParts}
-                                        title="Parts for This Step"
-                                        subtitle={`Step ${currentStep + 1} of ${steps.length}`}
-                                        defaultView="grid"
-                                        showViewToggle={true}
-                                        showSearch={false}
-                                        allowedViews={["grid", "compact"]}
-                                        className="shadow-2xl border-2 border-gray-700"
+                            {/* Bottom Overlay - Step Controls */}
+                            {steps.length > 0 && (
+                                <div className="absolute bottom-6 left-0 right-0 z-10 px-6">
+                                    <CompactStepOverlay
+                                        currentStep={currentStep}
+                                        totalSteps={steps.length}
+                                        showGhostParts={showGhostParts}
+                                        onToggleGhostParts={() =>
+                                            setShowGhostParts(!showGhostParts)
+                                        }
+                                        dimPreviousSteps={dimPreviousSteps}
+                                        onToggleDimPreviousSteps={() =>
+                                            setDimPreviousSteps(
+                                                !dimPreviousSteps,
+                                            )
+                                        }
+                                        previousStepsOpacity={
+                                            previousStepsOpacity
+                                        }
+                                        onOpacityChange={
+                                            setPreviousStepsOpacity
+                                        }
+                                        showCurrentStepBorder={
+                                            showCurrentStepBorder
+                                        }
+                                        onToggleCurrentStepBorder={() =>
+                                            setShowCurrentStepBorder(
+                                                !showCurrentStepBorder,
+                                            )
+                                        }
+                                        currentStepBorderColor={
+                                            currentStepBorderColor
+                                        }
+                                        onBorderColorChange={
+                                            setCurrentStepBorderColor
+                                        }
                                     />
                                 </div>
                             )}
@@ -366,20 +552,27 @@ export default function Home({ modelId }: ViewerProps = {}) {
                             <Canvas
                                 gl={{ preserveDrawingBuffer: true }}
                                 camera={{
-                                    position: [200, 200, 200],
-                                    fov: 50,
-                                    near: 0.1,
+                                    position: [400, 300, 400],
+                                    fov: 45,
+                                    near: 1,
                                     far: 100000,
                                 }}
                             >
-                                <ambientLight intensity={0.6} />
+                                <ambientLight intensity={0.7} />
                                 <directionalLight
-                                    position={[300, 500, 300]}
-                                    intensity={1}
+                                    position={[500, 800, 500]}
+                                    intensity={1.2}
+                                />
+                                <directionalLight
+                                    position={[-300, 500, -300]}
+                                    intensity={0.4}
                                 />
                                 <OrbitControls
-                                    minDistance={10}
-                                    maxDistance={10000}
+                                    ref={orbitControlsRef}
+                                    minDistance={50}
+                                    maxDistance={5000}
+                                    enableDamping
+                                    dampingFactor={0.05}
                                 />
                                 <Scene
                                     modelText={modelText}
@@ -394,6 +587,7 @@ export default function Home({ modelId }: ViewerProps = {}) {
                                         currentStepBorderColor
                                     }
                                     onLoadingChange={handleLoadingChange}
+                                    orbitControlsRef={orbitControlsRef}
                                 />
                             </Canvas>
 
@@ -459,133 +653,16 @@ export default function Home({ modelId }: ViewerProps = {}) {
                         </>
                     )}
                 </div>
-
-                {/* Right Sidebar - Compact Controls */}
-                <aside className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col overflow-hidden overflow-y-auto ">
-                    {/* Model Selector */}
-                    {savedModels.length > 0 && (
-                        <div className="p-4 border-b border-gray-700 shrink-0">
-                            <label className="text-xs font-semibold text-gray-400 mb-2 block">
-                                SELECT MODEL
-                            </label>
-                            <select
-                                value={selectedModelId}
-                                onChange={handleModelSelect}
-                                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                            >
-                                <option value="">Choose a model...</option>
-                                {savedModels.map((model) => (
-                                    <option key={model.id} value={model.id}>
-                                        {model.name} ({model.total_steps} steps)
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {/* Step Controls */}
-                    {steps.length > 0 && (
-                        <div className="p-4 border-b border-gray-700 shrink-0">
-                            <StepControls
-                                currentStep={currentStep}
-                                totalSteps={steps.length}
-                                onPrevious={handlePrevious}
-                                onNext={handleNext}
-                                showGhostParts={showGhostParts}
-                                onToggleGhostParts={() =>
-                                    setShowGhostParts(!showGhostParts)
-                                }
-                                dimPreviousSteps={dimPreviousSteps}
-                                onToggleDimPreviousSteps={() =>
-                                    setDimPreviousSteps(!dimPreviousSteps)
-                                }
-                                previousStepsOpacity={previousStepsOpacity}
-                                onOpacityChange={setPreviousStepsOpacity}
-                                showCurrentStepBorder={showCurrentStepBorder}
-                                onToggleCurrentStepBorder={() =>
-                                    setShowCurrentStepBorder(
-                                        !showCurrentStepBorder,
-                                    )
-                                }
-                                currentStepBorderColor={currentStepBorderColor}
-                                onBorderColorChange={setCurrentStepBorderColor}
-                            />
-                        </div>
-                    )}
-
-                    {/* Scrollable Content Area */}
-                    {steps.length > 0 && (
-                        <div className="flex-1">
-                            {/* Step Preview */}
-                            <div className="p-4 border-b border-gray-700">
-                                <h3 className="text-sm font-semibold text-gray-400 mb-3">
-                                    STEPS
-                                </h3>
-                                <StepPreview
-                                    steps={steps}
-                                    currentStep={currentStep}
-                                    onStepClick={handleStepClick}
-                                />
-                            </div>
-
-                            {/* Parts List */}
-                            <div className="p-4">
-                                <PartsDisplay
-                                    parts={currentStepParts}
-                                    title="Current Step Parts"
-                                    subtitle={`Step ${currentStep + 1}`}
-                                    defaultView="compact"
-                                    showViewToggle={true}
-                                    showSearch={false}
-                                    allowedViews={["grid", "compact"]}
-                                />
-                            </div>
-
-                            {/* All Parts Summary */}
-                            <div className="p-4 border-t border-gray-700">
-                                <PartsDisplay
-                                    parts={allParts}
-                                    title="All Parts"
-                                    subtitle={`Total for entire model`}
-                                    defaultView="compact"
-                                    showViewToggle={true}
-                                    showSearch={true}
-                                    allowedViews={["grid", "table", "compact"]}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Empty state when no model loaded */}
-                    {steps.length === 0 && savedModels.length > 0 && (
-                        <div className="flex-1 flex items-center justify-center p-8">
-                            <div className="text-center text-gray-500">
-                                <svg
-                                    className="w-16 h-16 mx-auto mb-4 text-gray-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                                    />
-                                </svg>
-                                <p className="text-sm">
-                                    Select a model above to start
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </aside>
             </div>
 
-            {/* Auth Modal */}
+            {/* Modals */}
             <AuthModal
                 isOpen={showAuthModal}
                 onClose={() => setShowAuthModal(false)}
+            />
+            <ViewerHelpModal
+                isOpen={showHelpModal}
+                onClose={() => setShowHelpModal(false)}
             />
         </div>
     );

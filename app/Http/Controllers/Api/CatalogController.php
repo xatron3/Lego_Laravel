@@ -80,7 +80,7 @@ class CatalogController extends Controller
 
     // Add image URLs
     $result->getCollection()->transform(function ($set) {
-      $set->image_url = $this->getSetImageUrl($set->set_num);
+      $set->image_url = $this->getSetImageUrl($set->set_num, $set->custom_image);
       return $set;
     });
 
@@ -96,7 +96,7 @@ class CatalogController extends Controller
       ->where('set_num', $setNum)
       ->firstOrFail();
 
-    $set->image_url = $this->getSetImageUrl($set->set_num);
+    $set->image_url = $this->getSetImageUrl($set->set_num, $set->custom_image);
     $set->bricklink_url = $this->getSetBricklinkUrl($set->set_num);
 
     // Aggregate parts from all inventories (usually just one)
@@ -134,7 +134,7 @@ class CatalogController extends Controller
             'name' => $invMinifig->minifig?->name ?? 'Unknown',
             'num_parts' => $invMinifig->minifig?->num_parts ?? 0,
             'quantity' => 0,
-            'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num),
+            'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num, $invMinifig->minifig?->custom_image),
             'bricklink_url' => $this->getMinifigBricklinkUrl($invMinifig->fig_num),
           ];
         }
@@ -195,7 +195,14 @@ class CatalogController extends Controller
 
     // Add image URLs (use color 0 = black as default)
     $colorId = $request->get('color_id', 0);
-    $result->getCollection()->transform(function ($part) use ($colorId) {
+
+    // Load the color data if a color filter is applied
+    $color = null;
+    if ($colorId && $colorId != 0) {
+      $color = Color::find($colorId);
+    }
+
+    $result->getCollection()->transform(function ($part) use ($colorId, $color) {
       $part->image_url = $this->getPartImageUrl($part->part_num, $colorId);
       // Add element photo as fallback (get first element for this part/color combo)
       $element = $part->elements()->where('color_id', $colorId)->first();
@@ -208,6 +215,17 @@ class CatalogController extends Controller
         $element = $part->elements()->first();
       }
       $part->photo_url = $element ? $this->getPartPhotoUrl($element->element_id) : null;
+
+      // Add color information if filtering by color
+      if ($color) {
+        $part->filtered_color = [
+          'id' => $color->id,
+          'name' => $color->name,
+          'rgb' => $color->rgb,
+          'is_trans' => $color->is_trans,
+        ];
+      }
+
       return $part;
     });
 
@@ -265,7 +283,7 @@ class CatalogController extends Controller
           'num_parts' => $set->num_parts,
           'quantity' => 0,
           'colors' => [],
-          'image_url' => $this->getSetImageUrl($set->set_num),
+          'image_url' => $this->getSetImageUrl($set->set_num, $set->custom_image),
           'bricklink_url' => $this->getSetBricklinkUrl($set->set_num),
         ];
       }
@@ -325,7 +343,7 @@ class CatalogController extends Controller
 
     // Add image URLs
     $result->getCollection()->transform(function ($minifig) {
-      $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num);
+      $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num, $minifig->custom_image);
       return $minifig;
     });
 
@@ -341,7 +359,7 @@ class CatalogController extends Controller
       ->where('fig_num', $figNum)
       ->firstOrFail();
 
-    $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num);
+    $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num, $minifig->custom_image);
     $minifig->bricklink_url = $this->getMinifigBricklinkUrl($minifig->fig_num);
 
     // Get sets that contain this minifig
@@ -359,7 +377,7 @@ class CatalogController extends Controller
           'theme' => $set->theme?->name,
           'num_parts' => $set->num_parts,
           'quantity' => 0,
-          'image_url' => $this->getSetImageUrl($set->set_num),
+          'image_url' => $this->getSetImageUrl($set->set_num, $set->custom_image),
           'bricklink_url' => $this->getSetBricklinkUrl($set->set_num),
         ];
       }
@@ -598,10 +616,14 @@ class CatalogController extends Controller
   }
 
   /**
-   * Get Rebrickable image URL for a set.
+   * Get image URL for a set.
+   * Uses custom image if available, otherwise falls back to Rebrickable CDN.
    */
-  private function getSetImageUrl(string $setNum): string
+  private function getSetImageUrl(string $setNum, ?string $customImage = null): string
   {
+    if ($customImage) {
+      return "/storage/{$customImage}";
+    }
     return "https://cdn.rebrickable.com/media/sets/{$setNum}.jpg";
   }
 
@@ -625,10 +647,14 @@ class CatalogController extends Controller
   }
 
   /**
-   * Get Rebrickable image URL for a minifig.
+   * Get image URL for a minifig.
+   * Uses custom image if available, otherwise falls back to Rebrickable CDN.
    */
-  private function getMinifigImageUrl(string $figNum): string
+  private function getMinifigImageUrl(string $figNum, ?string $customImage = null): string
   {
+    if ($customImage) {
+      return "/storage/{$customImage}";
+    }
     return "https://cdn.rebrickable.com/media/sets/{$figNum}.jpg";
   }
 
@@ -712,7 +738,7 @@ class CatalogController extends Controller
       if ($set->moc) {
         $set->image_url = $set->moc->thumbnail;
       } else {
-        $set->image_url = $this->getSetImageUrl($set->set_num);
+        $set->image_url = $this->getSetImageUrl($set->set_num, $set->custom_image);
       }
       return $set;
     });
@@ -783,7 +809,7 @@ class CatalogController extends Controller
               'name' => $invMinifig->minifig?->name ?? 'Unknown',
               'num_parts' => $invMinifig->minifig?->num_parts ?? 0,
               'quantity' => 0,
-              'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num),
+              'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num, $invMinifig->minifig?->custom_image),
               'bricklink_url' => $this->getMinifigBricklinkUrl($invMinifig->fig_num),
             ];
           }
@@ -834,7 +860,7 @@ class CatalogController extends Controller
             ->orWhere('set_num', 'like', "%{$query}%");
         })
         ->limit(5)
-        ->get(['set_num', 'name', 'year', 'num_parts']);
+        ->get(['set_num', 'name', 'year', 'num_parts', 'custom_image']);
 
       foreach ($sets as $set) {
         $results[] = [
@@ -842,7 +868,7 @@ class CatalogController extends Controller
           'id' => $set->set_num,
           'name' => $set->name,
           'subtitle' => "{$set->year} · {$set->num_parts} pcs",
-          'image_url' => "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
+          'image_url' => $set->custom_image ? "/storage/{$set->custom_image}" : "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
           'url' => "/catalog/sets/{$set->set_num}",
         ];
       }
@@ -855,7 +881,7 @@ class CatalogController extends Controller
             ->orWhere('set_num', 'like', "%{$query}%");
         })
         ->limit(5)
-        ->get(['set_num', 'name', 'year', 'num_parts']);
+        ->get(['set_num', 'name', 'year', 'num_parts', 'custom_image']);
 
       foreach ($mocs as $moc) {
         $results[] = [
@@ -863,7 +889,7 @@ class CatalogController extends Controller
           'id' => $moc->set_num,
           'name' => $moc->name,
           'subtitle' => "{$moc->num_parts} pcs",
-          'image_url' => "https://cdn.rebrickable.com/media/sets/{$moc->set_num}.jpg",
+          'image_url' => $moc->custom_image ? "/storage/{$moc->custom_image}" : "https://cdn.rebrickable.com/media/sets/{$moc->set_num}.jpg",
           'url' => "/catalog/sets/{$moc->set_num}",
         ];
       }
@@ -875,7 +901,7 @@ class CatalogController extends Controller
           ->orWhere('part_num', 'like', "%{$query}%");
       })
         ->limit(5)
-        ->get(['part_num', 'name']);
+        ->get(['part_num', 'name', 'custom_image']);
 
       foreach ($parts as $part) {
         $results[] = [
@@ -883,7 +909,7 @@ class CatalogController extends Controller
           'id' => $part->part_num,
           'name' => $part->name,
           'subtitle' => $part->part_num,
-          'image_url' => "https://cdn.rebrickable.com/media/parts/ldraw/0/{$part->part_num}.png",
+          'image_url' => $part->custom_image ? "/storage/{$part->custom_image}" : "https://cdn.rebrickable.com/media/parts/ldraw/0/{$part->part_num}.png",
           'url' => "/catalog/parts/{$part->part_num}",
         ];
       }
@@ -895,7 +921,7 @@ class CatalogController extends Controller
           ->orWhere('fig_num', 'like', "%{$query}%");
       })
         ->limit(5)
-        ->get(['fig_num', 'name', 'num_parts']);
+        ->get(['fig_num', 'name', 'num_parts', 'custom_image']);
 
       foreach ($minifigs as $fig) {
         $results[] = [
@@ -903,7 +929,7 @@ class CatalogController extends Controller
           'id' => $fig->fig_num,
           'name' => $fig->name,
           'subtitle' => "{$fig->num_parts} parts",
-          'image_url' => "https://cdn.rebrickable.com/media/sets/{$fig->fig_num}.jpg",
+          'image_url' => $fig->custom_image ? "/storage/{$fig->custom_image}" : "https://cdn.rebrickable.com/media/sets/{$fig->fig_num}.jpg",
           'url' => "/catalog/minifigs/{$fig->fig_num}",
         ];
       }
@@ -922,7 +948,7 @@ class CatalogController extends Controller
           'id' => (string) $theme->id,
           'name' => $theme->name,
           'subtitle' => "{$theme->sets_count} sets",
-          'image_url' => '', // Themes don't have images
+          'image_url' => $theme->custom_image ? "/storage/{$theme->custom_image}" : '',
           'url' => "/catalog/themes/{$theme->id}",
         ];
       }

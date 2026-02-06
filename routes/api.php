@@ -136,6 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\RebrickableController;
+use App\Http\Controllers\Api\AdminCatalogController;
 
 // Admin API Routes - Accept both web session and Sanctum token auth
 Route::prefix('admin')->middleware(['auth:sanctum,web', 'role:admin'])->group(function () {
@@ -159,6 +160,25 @@ Route::prefix('admin')->middleware(['auth:sanctum,web', 'role:admin'])->group(fu
   Route::get('/models', [AdminController::class, 'models']);
   Route::patch('/models/{id}', [AdminController::class, 'updateModel']);
   Route::delete('/models/{id}', [AdminController::class, 'deleteModel']);
+
+  // Catalog Management (Sets, Parts, Minifigs, Themes)
+  Route::prefix('catalog')->group(function () {
+    Route::get('/stats', [AdminCatalogController::class, 'stats']);
+    Route::get('/{type}', [AdminCatalogController::class, 'index'])
+      ->where('type', 'sets|parts|minifigs|themes');
+    Route::post('/{type}', [AdminCatalogController::class, 'store'])
+      ->where('type', 'sets|parts|minifigs|themes');
+    Route::get('/{type}/{id}', [AdminCatalogController::class, 'show'])
+      ->where('type', 'sets|parts|minifigs|themes');
+    Route::put('/{type}/{id}', [AdminCatalogController::class, 'update'])
+      ->where('type', 'sets|parts|minifigs|themes');
+    Route::delete('/{type}/{id}', [AdminCatalogController::class, 'destroy'])
+      ->where('type', 'sets|parts|minifigs|themes');
+    Route::post('/{type}/{id}/image', [AdminCatalogController::class, 'uploadImage'])
+      ->where('type', 'sets|parts|minifigs|themes');
+    Route::delete('/{type}/{id}/image', [AdminCatalogController::class, 'deleteImage'])
+      ->where('type', 'sets|parts|minifigs|themes');
+  });
 
   // Rebrickable Data Management
   Route::prefix('rebrickable')->group(function () {

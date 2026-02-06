@@ -16,6 +16,7 @@ class Theme extends Model
     'id',
     'name',
     'parent_id',
+    'custom_image',
   ];
 
   protected $casts = [

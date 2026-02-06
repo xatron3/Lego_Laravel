@@ -8,8 +8,11 @@ import {
     LineBasicMaterial,
     BufferGeometry,
     Mesh,
+    Box3,
+    Vector3,
 } from "three";
 import { useSceneLoader } from "./hooks/useSceneLoader";
+import { useThree } from "@react-three/fiber";
 
 export default function Scene({
     modelText,
@@ -21,6 +24,7 @@ export default function Scene({
     currentStepBorderColor = "#ef4444",
     onMissingParts,
     onLoadingChange,
+    orbitControlsRef,
 }: {
     modelText: string;
     currentStep: number;
@@ -34,12 +38,58 @@ export default function Scene({
         isLoading: boolean,
         progress: { loaded: number; total: number },
     ) => void;
+    orbitControlsRef?: React.MutableRefObject<any>;
 }) {
     const { model, error, isLoading, missingParts, loadingProgress } =
         useSceneLoader(modelText);
     const [visibleModel, setVisibleModel] = useState<Group | null>(null);
     const materialsCloned = useRef(false);
     const bordersRef = useRef<LineSegments[]>([]);
+    const { camera } = useThree();
+    const initialCameraSetup = useRef(false);
+
+    // Initial camera setup when model first loads
+    useEffect(() => {
+        if (!model || !orbitControlsRef?.current || initialCameraSetup.current)
+            return;
+
+        initialCameraSetup.current = true;
+
+        // Calculate the bounding box of the entire model
+        const box = new Box3().setFromObject(model);
+        const center = new Vector3();
+        box.getCenter(center);
+
+        const size = new Vector3();
+        box.getSize(size);
+
+        // Calculate optimal camera distance to fit the entire model
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2)) * 2.5; // 2.5x for comfortable initial view
+
+        // Position camera at 45-degree angle for nice initial view
+        const angle = Math.PI / 4; // 45 degrees
+        const newCameraPos = new Vector3(
+            center.x + cameraDistance * Math.cos(angle),
+            center.y + cameraDistance * 0.7, // Slightly elevated
+            center.z + cameraDistance * Math.sin(angle),
+        );
+
+        camera.position.copy(newCameraPos);
+        camera.lookAt(center);
+
+        const controls = orbitControlsRef.current;
+        if (controls && controls.target) {
+            controls.target.copy(center);
+            controls.update();
+        }
+    }, [model, camera, orbitControlsRef]);
+
+    // Reset initial camera setup flag when model changes
+    useEffect(() => {
+        initialCameraSetup.current = false;
+    }, [modelText]);
 
     // Reset materials cloned state when model changes
     useEffect(() => {

@@ -93,22 +93,22 @@ export default function PartDetail({ part }: PartDetailProps) {
                                     <div className="flex flex-wrap gap-2">
                                         {part.available_colors.map((color) => (
                                             <button
-                                                key={color.color_id}
+                                                key={color.id}
                                                 onClick={() =>
                                                     setSelectedColor(color)
                                                 }
                                                 className={`group relative w-10 h-10 rounded-lg border-2 transition-all ${
-                                                    selectedColor?.color_id ===
-                                                    color.color_id
+                                                    selectedColor?.id ===
+                                                    color.id
                                                         ? "border-yellow-400 scale-110"
                                                         : "border-gray-600 hover:border-gray-400"
                                                 }`}
-                                                title={color.color_name}
+                                                title={color.name}
                                             >
                                                 <div
                                                     className="w-full h-full rounded-md"
                                                     style={{
-                                                        backgroundColor: `#${color.color_rgb}`,
+                                                        backgroundColor: `#${color.rgb}`,
                                                     }}
                                                 />
                                             </button>
@@ -116,7 +116,7 @@ export default function PartDetail({ part }: PartDetailProps) {
                                     </div>
                                     {selectedColor && (
                                         <div className="mt-3 text-white">
-                                            {selectedColor.color_name}
+                                            {selectedColor.name}
                                         </div>
                                     )}
                                 </div>

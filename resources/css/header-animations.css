@@ -1,0 +1,120 @@
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-slideDown {
+    animation: slideDown 0.2s ease-out;
+}
+
+.animate-slideUp {
+    animation: slideUp 0.2s ease-out;
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.15s ease-out;
+}
+
+/* Smooth submenu transitions */
+.submenu-enter {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+.submenu-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+        opacity 200ms,
+        transform 200ms;
+}
+
+.submenu-exit {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.submenu-exit-active {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition:
+        opacity 150ms,
+        transform 150ms;
+}
+
+/* Mobile menu slide animation */
+.mobile-menu-enter {
+    max-height: 0;
+    opacity: 0;
+}
+
+.mobile-menu-enter-active {
+    max-height: 1000px;
+    opacity: 1;
+    transition:
+        max-height 300ms ease-out,
+        opacity 200ms ease-out;
+}
+
+.mobile-menu-exit {
+    max-height: 1000px;
+    opacity: 1;
+}
+
+.mobile-menu-exit-active {
+    max-height: 0;
+    opacity: 0;
+    transition:
+        max-height 250ms ease-in,
+        opacity 150ms ease-in;
+}
+
+/* Autocomplete dropdown */
+.autocomplete-dropdown {
+    animation: slideDown 0.2s ease-out;
+}
+
+/* Scrollbar styling for search results */
+.search-results-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.search-results-scrollbar::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.5);
+    border-radius: 4px;
+}
+
+.search-results-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.8);
+    border-radius: 4px;
+}
+
+.search-results-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(107, 114, 128, 0.9);
+}

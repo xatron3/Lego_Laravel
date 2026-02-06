@@ -6,6 +6,7 @@ interface AdminNavProps {
         | "users"
         | "models"
         | "sales"
+        | "catalog"
         | "data-import"
         | "site-settings";
 }
@@ -28,6 +29,12 @@ export default function AdminNav({ currentPage }: AdminNavProps) {
             adminOnly: false,
         },
         { id: "sales", label: "Sales", href: "/admin/sales", adminOnly: true },
+        {
+            id: "catalog",
+            label: "Catalog",
+            href: "/admin/catalog",
+            adminOnly: true,
+        },
         {
             id: "data-import",
             label: "Data Import",

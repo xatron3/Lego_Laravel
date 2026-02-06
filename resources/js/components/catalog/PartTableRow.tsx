@@ -35,7 +35,27 @@ export default function PartTableRow({ part }: PartTableRowProps) {
                 <div className="text-sm text-white group-hover:text-yellow-400 truncate transition-colors">
                     {part.name}
                 </div>
-                <div className="text-xs text-gray-400">{part.part_num}</div>
+                <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-400">
+                        {part.part_num}
+                    </span>
+                    {part.filtered_color && (
+                        <>
+                            <span className="text-gray-600">•</span>
+                            <div className="flex items-center gap-1">
+                                <div
+                                    className="w-3 h-3 rounded border border-gray-600 shrink-0"
+                                    style={{
+                                        backgroundColor: `#${part.filtered_color.rgb}`,
+                                    }}
+                                />
+                                <span className="text-xs text-gray-400">
+                                    {part.filtered_color.name}
+                                </span>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
             {part.category && (
                 <div className="hidden md:block text-xs text-gray-400 w-32 truncate text-right">

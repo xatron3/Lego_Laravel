@@ -69,7 +69,9 @@ export default function FlipItemSearch({ onSelect }: FlipItemSearchProps) {
                             id: s.set_num,
                             name: s.name,
                             extra: `${s.year || ""} · ${s.num_parts || 0} parts`,
-                            image_url: `https://cdn.rebrickable.com/media/sets/${s.set_num}.jpg`,
+                            image_url:
+                                s.image_url ||
+                                `https://cdn.rebrickable.com/media/sets/${s.set_num}.jpg`,
                         })),
                     );
                 } else {
@@ -79,7 +81,9 @@ export default function FlipItemSearch({ onSelect }: FlipItemSearchProps) {
                             id: m.fig_num,
                             name: m.name,
                             extra: `${m.num_parts || 0} parts`,
-                            image_url: `https://cdn.rebrickable.com/media/sets/minifigs/${m.fig_num}.jpg`,
+                            image_url:
+                                m.image_url ||
+                                `https://cdn.rebrickable.com/media/sets/${m.fig_num}.jpg`,
                         })),
                     );
                 }

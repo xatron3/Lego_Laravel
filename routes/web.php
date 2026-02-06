@@ -144,6 +144,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
   Route::get('/site-settings', function () {
     return Inertia::render('AdminSiteSettings');
   })->name('admin.site-settings');
+
+  Route::get('/catalog', function () {
+    return Inertia::render('AdminCatalog');
+  })->name('admin.catalog');
 });
 
 /*
