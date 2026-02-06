@@ -119,21 +119,4 @@ class PageController extends Controller
       'initialSearch' => $search,
     ]);
   }
-
-  public function catalog(): Response
-  {
-    // Get catalog stats - share with page to avoid API call
-    $stats = [
-      'sets' => \App\Models\Set::official()->count(),
-      'mocs' => \App\Models\Set::mocs()->count(),
-      'parts' => \App\Models\Part::count(),
-      'minifigs' => \App\Models\Minifig::count(),
-      'colors' => \App\Models\Color::count(),
-      'themes' => \App\Models\Theme::count(),
-    ];
-
-    return Inertia::render('Catalog', [
-      'initialStats' => $stats,
-    ]);
-  }
 }

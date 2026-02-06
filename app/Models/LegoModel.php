@@ -12,6 +12,9 @@ class LegoModel extends Model
 {
   use HasFactory;
 
+  // Use the mocs table (LegoModel is deprecated, use Moc instead)
+  protected $table = 'mocs';
+
   protected $fillable = [
     'name',
     'description',
@@ -51,7 +54,7 @@ class LegoModel extends Model
    */
   public function owners(): BelongsToMany
   {
-    return $this->belongsToMany(User::class, 'user_owned_models')
+    return $this->belongsToMany(User::class, 'user_owned_models', 'moc_id', 'user_id')
       ->withPivot(['type', 'price_paid'])
       ->withTimestamps();
   }

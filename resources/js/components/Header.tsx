@@ -6,7 +6,13 @@ import UserMenu from "./UserMenu";
 interface HeaderProps {
     onOpenAuthModal?: () => void;
     fixed?: boolean;
-    currentPage?: "home" | "store" | "catalog" | "viewer" | "dashboard";
+    currentPage?:
+        | "home"
+        | "store"
+        | "catalog"
+        | "viewer"
+        | "dashboard"
+        | "flipping";
 }
 
 export default function Header({

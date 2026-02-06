@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { router } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -7,7 +7,8 @@ import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import Scene from "../Scene";
-import { api, LegoModelData, InventoryPartData, MocImageData } from "../api";
+import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
+import { api, LegoModelData, InventoryPartData } from "../api";
 
 interface ModelDetailProps {
     id: string;
@@ -33,6 +34,23 @@ export default function ModelDetail({ id }: ModelDetailProps) {
     // Image gallery state
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [showViewer, setShowViewer] = useState(false);
+
+    // Transform parts data for PartsDisplay component
+    const partsForDisplay = useMemo<PartDisplayItem[]>(() => {
+        if (!model?.parts) return [];
+        return model.parts.map((part) => ({
+            partId: part.part_num,
+            name: part.name,
+            colorId: part.color_id,
+            colorName: part.color_name,
+            colorRgb: part.color_rgb,
+            count: part.quantity,
+            imageUrl: part.image_url,
+            photoUrl: part.photo_url,
+            category: part.category,
+            bricklinkUrl: part.bricklink_url,
+        }));
+    }, [model?.parts]);
 
     useEffect(() => {
         loadModel();
@@ -587,45 +605,16 @@ export default function ModelDetail({ id }: ModelDetailProps) {
 
                         {/* Parts List Section */}
                         {model.parts && model.parts.length > 0 && (
-                            <div className="bg-gray-800 rounded-2xl p-6">
-                                <h2 className="text-xl font-bold text-white mb-4">
-                                    Parts List ({model.parts_count})
-                                </h2>
-                                <div className="bg-gray-700 rounded-xl overflow-hidden">
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead className="bg-gray-600">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left text-gray-300 font-medium">
-                                                        Part
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left text-gray-300 font-medium">
-                                                        Color
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left text-gray-300 font-medium">
-                                                        Category
-                                                    </th>
-                                                    <th className="px-4 py-3 text-center text-gray-300 font-medium">
-                                                        Qty
-                                                    </th>
-                                                    <th className="px-4 py-3 text-center text-gray-300 font-medium">
-                                                        Buy
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-600">
-                                                {model.parts.map(
-                                                    (part, idx) => (
-                                                        <PartRow
-                                                            key={idx}
-                                                            part={part}
-                                                        />
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
+                            <div className="mt-6">
+                                <PartsDisplay
+                                    parts={partsForDisplay}
+                                    title={`Parts List (${model.parts_count})`}
+                                    subtitle={`All ${model.parts_count} unique parts in this model`}
+                                    defaultView="table"
+                                    showViewToggle={true}
+                                    showSearch={true}
+                                    allowedViews={["grid", "table", "compact"]}
+                                />
                             </div>
                         )}
                     </>
@@ -638,83 +627,6 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                 onClose={() => setShowAuthModal(false)}
             />
         </div>
-    );
-}
-
-// ==================== Parts List Component ====================
-
-function PartRow({ part }: { part: InventoryPartData }) {
-    const [imgError, setImgError] = useState(false);
-    const [photoError, setPhotoError] = useState(false);
-
-    // Determine which image to show
-    const imageUrl = !imgError
-        ? part.image_url
-        : !photoError && part.photo_url
-          ? part.photo_url
-          : null;
-
-    return (
-        <tr className="hover:bg-gray-650">
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-600 rounded-lg overflow-hidden shrink-0">
-                        {imageUrl ? (
-                            <img
-                                src={imageUrl}
-                                alt={part.name}
-                                className="w-full h-full object-contain"
-                                onError={() => {
-                                    if (!imgError) {
-                                        setImgError(true);
-                                    } else {
-                                        setPhotoError(true);
-                                    }
-                                }}
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                🧱
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <div className="text-white">{part.name}</div>
-                        <div className="text-yellow-400 text-sm font-mono">
-                            {part.part_num}
-                        </div>
-                    </div>
-                </div>
-            </td>
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <div
-                        className="w-5 h-5 rounded border border-gray-500"
-                        style={{ backgroundColor: `#${part.color_rgb}` }}
-                    />
-                    <span className="text-gray-300">{part.color_name}</span>
-                </div>
-            </td>
-            <td className="px-4 py-3 text-gray-300">{part.category}</td>
-            <td className="px-4 py-3 text-center">
-                <span className="bg-gray-600 px-2 py-1 rounded text-white font-medium">
-                    {part.quantity}×
-                </span>
-                {part.is_spare && (
-                    <span className="ml-2 text-xs text-gray-400">(spare)</span>
-                )}
-            </td>
-            <td className="px-4 py-3 text-center">
-                <a
-                    href={part.bricklink_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 text-sm"
-                >
-                    BrickLink
-                </a>
-            </td>
-        </tr>
     );
 }
 

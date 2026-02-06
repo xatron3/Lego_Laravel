@@ -19,6 +19,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use App\Jobs\ImportRebrickableData;
 
 class RebrickableController extends Controller
 {
@@ -142,7 +144,7 @@ class RebrickableController extends Controller
   }
 
   /**
-   * Import CSV file from server data directory.
+   * Import CSV file from server data directory (dispatches background job).
    */
   public function importFromServer(Request $request, string $table): JsonResponse
   {
@@ -150,85 +152,165 @@ class RebrickableController extends Controller
       return response()->json(['message' => 'Invalid table name.'], 400);
     }
 
-    // Increase execution time for large imports
-    set_time_limit(600); // 10 minutes
-    ini_set('memory_limit', '512M');
-
-    $config = $this->tableConfig[$table];
     $filePath = base_path("data/{$table}.csv");
 
     if (!file_exists($filePath)) {
       return response()->json(['message' => "CSV file not found: {$table}.csv"], 404);
     }
 
-    try {
-      $imported = $this->importCsvFile($filePath, $table, $config);
+    // Generate job ID
+    $jobId = uniqid('import_', true);
 
-      return response()->json([
-        'message' => "Successfully processed {$imported} records in {$table}.",
-        'imported' => $imported,
-        'table' => $table,
-      ]);
-    } catch (\Exception $e) {
-      Log::error("Failed to import {$table}: " . $e->getMessage());
-      return response()->json([
-        'message' => 'Import failed: ' . $e->getMessage(),
-      ], 500);
-    }
+    // Initialize progress in cache
+    Cache::put("import_progress:{$jobId}", [
+      'status' => 'pending',
+      'progress' => 0,
+      'message' => 'Import job queued...',
+      'table' => $table,
+      'updated_at' => now()->toISOString(),
+    ], now()->addHours(24));
+
+    // Track this job ID
+    $this->trackJobId($jobId);
+
+    // Dispatch job
+    ImportRebrickableData::dispatch($table, $jobId);
+
+    return response()->json([
+      'message' => "Import job started for {$table}.",
+      'job_id' => $jobId,
+      'table' => $table,
+    ]);
   }
 
   /**
-   * Import all tables from server data directory in correct order.
+   * Import all tables from server data directory in correct order (dispatches background job).
    */
   public function importAllFromServer(): JsonResponse
   {
-    // Increase execution time for large imports (30 minutes)
-    set_time_limit(1800);
-    ini_set('memory_limit', '1G');
+    // Generate job ID
+    $jobId = uniqid('import_all_', true);
 
-    $results = [];
-    $errors = [];
+    // Initialize progress in cache
+    Cache::put("import_progress:{$jobId}", [
+      'status' => 'pending',
+      'progress' => 0,
+      'message' => 'Import job queued for all tables...',
+      'table' => 'all',
+      'updated_at' => now()->toISOString(),
+    ], now()->addHours(24));
 
-    // Import order matters due to foreign keys
-    $importOrder = [
-      'themes',
-      'colors',
-      'part_categories',
-      'parts',
-      'minifigs',
-      'sets',
-      'inventories',
-      'elements',
-      'part_relationships',
-      'inventory_parts',
-      'inventory_minifigs',
-      'inventory_sets',
-    ];
+    // Track this job ID
+    $this->trackJobId($jobId);
 
-    foreach ($importOrder as $table) {
-      $filePath = base_path("data/{$table}.csv");
+    // Dispatch job (null table means import all)
+    ImportRebrickableData::dispatch(null, $jobId);
 
-      if (!file_exists($filePath)) {
-        $errors[$table] = "File not found: {$table}.csv";
-        continue;
-      }
+    return response()->json([
+      'message' => 'Import job started for all tables.',
+      'job_id' => $jobId,
+    ]);
+  }
 
-      try {
-        $config = $this->tableConfig[$table];
-        $imported = $this->importCsvFile($filePath, $table, $config);
-        $results[$table] = $imported;
-      } catch (\Exception $e) {
-        Log::error("Failed to import {$table}: " . $e->getMessage());
-        $errors[$table] = $e->getMessage();
-        // Continue with other tables even if one fails
+  /**
+   * Get import progress for a job.
+   */
+  public function progress(string $jobId): JsonResponse
+  {
+    $progress = Cache::get("import_progress:{$jobId}");
+
+    if (!$progress) {
+      return response()->json([
+        'message' => 'Job not found or expired.',
+      ], 404);
+    }
+
+    return response()->json($progress);
+  }
+
+  /**
+   * List all recent import jobs (last 100).
+   */
+  public function listJobs(): JsonResponse
+  {
+    // Get all job IDs from cache keys
+    $cacheKeys = Cache::get('import_job_ids', []);
+
+    // Get jobs info, newest first
+    $jobs = [];
+    foreach (array_reverse($cacheKeys) as $jobId) {
+      $progress = Cache::get("import_progress:{$jobId}");
+      if ($progress) {
+        $jobs[] = array_merge(['job_id' => $jobId], $progress);
       }
     }
 
+    return response()->json($jobs);
+  }
+
+  /**
+   * Retry a failed import job.
+   */
+  public function retryJob(string $jobId): JsonResponse
+  {
+    $progress = Cache::get("import_progress:{$jobId}");
+
+    if (!$progress) {
+      return response()->json([
+        'message' => 'Job not found or expired.',
+      ], 404);
+    }
+
+    if ($progress['status'] === 'completed') {
+      return response()->json([
+        'message' => 'Completed jobs cannot be retried.',
+      ], 400);
+    }
+
+    // Create new job with same table
+    $table = $progress['table'] ?? null;
+    if ($table === 'all') {
+      $table = null; // null means all tables
+    }
+
+    $newJobId = uniqid('retry_', true);
+
+    // Initialize progress
+    Cache::put("import_progress:{$newJobId}", [
+      'status' => 'pending',
+      'progress' => 0,
+      'message' => 'Retry job queued...',
+      'table' => $progress['table'],
+      'updated_at' => now()->toISOString(),
+    ], now()->addHours(24));
+
+    // Track this job ID
+    $this->trackJobId($newJobId);
+
+    // Dispatch job
+    ImportRebrickableData::dispatch($table, $newJobId);
+
     return response()->json([
-      'message' => 'Import completed.',
-      'results' => $results,
-      'errors' => $errors,
+      'message' => 'Retry job started.',
+      'job_id' => $newJobId,
+      'table' => $progress['table'],
     ]);
+  }
+
+  /**
+   * Track job ID in cache.
+   */
+  private function trackJobId(string $jobId): void
+  {
+    $jobIds = Cache::get('import_job_ids', []);
+    $jobIds[] = $jobId;
+
+    // Keep only last 100 jobs
+    if (count($jobIds) > 100) {
+      $jobIds = array_slice($jobIds, -100);
+    }
+
+    Cache::put('import_job_ids', $jobIds, now()->addDays(7));
   }
 
   /**

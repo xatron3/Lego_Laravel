@@ -24,8 +24,13 @@ Route::middleware('web')->group(function () {
   Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('auth.google.callback');
 });
 
-// API Authentication Routes
-Route::prefix('api/auth')->group(function () {
+// API Authentication Routes - ensure session middleware is applied
+Route::prefix('api/auth')->middleware([
+  \Illuminate\Cookie\Middleware\EncryptCookies::class,
+  \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+  \Illuminate\Session\Middleware\StartSession::class,
+  \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+])->group(function () {
   Route::get('/user', [AuthController::class, 'user']);
   Route::post('/register', [AuthController::class, 'register']);
   Route::post('/login', [AuthController::class, 'login']);

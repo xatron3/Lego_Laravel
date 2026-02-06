@@ -147,6 +147,9 @@ Route::prefix('admin')->middleware(['auth:sanctum,web', 'role:admin'])->group(fu
     Route::get('/stats', [RebrickableController::class, 'stats']);
     Route::get('/tables', [RebrickableController::class, 'tables']);
     Route::post('/import-all', [RebrickableController::class, 'importAllFromServer']);
+    Route::get('/jobs', [RebrickableController::class, 'listJobs']);
+    Route::get('/progress/{jobId}', [RebrickableController::class, 'progress']);
+    Route::post('/retry/{jobId}', [RebrickableController::class, 'retryJob']);
     Route::post('/clear-all', [RebrickableController::class, 'clearAll']);
     Route::post('/{table}/import', [RebrickableController::class, 'import']);
     Route::post('/{table}/import-server', [RebrickableController::class, 'importFromServer']);

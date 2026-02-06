@@ -83,7 +83,25 @@ export default function CatalogDetail({ type, id }: Props) {
     }, [type, id]);
 
     const goBack = () => {
-        router.visit("/catalog");
+        // Navigate back to the appropriate category page
+        const backUrls: Record<string, string> = {
+            set: "/catalog/sets",
+            part: "/catalog/parts",
+            minifig: "/catalog/minifigs",
+            color: "/catalog",
+            theme: "/catalog",
+            category: "/catalog/parts",
+        };
+        router.visit(backUrls[type] || "/catalog");
+    };
+
+    const backLabels: Record<string, string> = {
+        set: "Back to Sets",
+        part: "Back to Parts",
+        minifig: "Back to Minifigs",
+        color: "Back to Catalog",
+        theme: "Back to Catalog",
+        category: "Back to Parts",
     };
 
     return (
@@ -116,7 +134,7 @@ export default function CatalogDetail({ type, id }: Props) {
                             d="M15 19l-7-7 7-7"
                         />
                     </svg>
-                    Back to Catalog
+                    {backLabels[type] || "Back to Catalog"}
                 </button>
 
                 {isLoading ? (

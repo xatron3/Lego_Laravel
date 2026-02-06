@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useImageFallback } from "../../hooks/useImageFallback";
 import type { CatalogSet, CatalogSetPart, CatalogSetMinifig } from "../../api";
 import BricklinkButton from "./BricklinkButton";
 import StatCard from "./StatCard";
+import PartsDisplay, { PartDisplayItem } from "../PartsDisplay";
 import {
     catalogThemeUrl,
     catalogPartUrl,
@@ -19,6 +20,24 @@ interface SetDetailProps {
 export default function SetDetail({ set }: SetDetailProps) {
     const { imageUrl, handleError } = useImageFallback(set.image_url);
     const [activeTab, setActiveTab] = useState<"parts" | "minifigs">("parts");
+
+    // Transform catalog parts to PartsDisplay format
+    const partsForDisplay = useMemo<PartDisplayItem[]>(() => {
+        if (!set.parts) return [];
+        return set.parts.map((part) => ({
+            partId: part.part_num,
+            name: part.name,
+            colorId: part.color_id,
+            colorName: part.color_name,
+            colorRgb: part.color_rgb,
+            count: part.quantity,
+            imageUrl: part.image_url,
+            photoUrl: part.photo_url,
+            category: part.category,
+            isSpare: part.is_spare,
+            bricklinkUrl: part.bricklink_url,
+        }));
+    }, [set.parts]);
 
     return (
         <div>
@@ -123,8 +142,16 @@ export default function SetDetail({ set }: SetDetailProps) {
             </div>
 
             {/* Tab Content */}
-            {activeTab === "parts" && set.parts && (
-                <PartsTable parts={set.parts} />
+            {activeTab === "parts" && (
+                <PartsDisplay
+                    parts={partsForDisplay}
+                    title={`Parts in ${set.name}`}
+                    subtitle={`${set.parts_count} unique parts, ${set.total_pieces || set.num_parts} total pieces`}
+                    defaultView="table"
+                    showViewToggle={true}
+                    showSearch={true}
+                    allowedViews={["grid", "table", "compact"]}
+                />
             )}
             {activeTab === "minifigs" && set.minifigs_list && (
                 <MinifigsGrid minifigs={set.minifigs_list} />
@@ -153,121 +180,6 @@ function TabButton({ active, onClick, label }: TabButtonProps) {
         >
             {label}
         </button>
-    );
-}
-
-interface PartsTableProps {
-    parts: CatalogSetPart[];
-}
-
-function PartsTable({ parts }: PartsTableProps) {
-    return (
-        <div className="bg-gray-800 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead className="bg-gray-700">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-gray-300 font-medium">
-                                Part
-                            </th>
-                            <th className="px-4 py-3 text-left text-gray-300 font-medium">
-                                Color
-                            </th>
-                            <th className="px-4 py-3 text-left text-gray-300 font-medium">
-                                Category
-                            </th>
-                            <th className="px-4 py-3 text-center text-gray-300 font-medium">
-                                Quantity
-                            </th>
-                            <th className="px-4 py-3 text-center text-gray-300 font-medium">
-                                Link
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                        {parts.map((part, idx) => (
-                            <PartRow
-                                key={`${part.part_num}-${part.color_id}-${idx}`}
-                                part={part}
-                            />
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
-interface PartRowProps {
-    part: CatalogSetPart;
-}
-
-function PartRow({ part }: PartRowProps) {
-    const { imageUrl, handleError } = useImageFallback(
-        part.image_url,
-        part.photo_url,
-    );
-
-    return (
-        <tr className="hover:bg-gray-750">
-            <td className="px-4 py-3">
-                <a
-                    href={catalogPartUrl(part)}
-                    className="flex items-center gap-3 group"
-                >
-                    <div className="w-12 h-12 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
-                        {imageUrl ? (
-                            <img
-                                src={imageUrl}
-                                alt={part.name}
-                                className="w-full h-full object-contain"
-                                onError={handleError}
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-500">
-                                🧱
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <div className="text-white group-hover:text-yellow-400 transition-colors">
-                            {part.name}
-                        </div>
-                        <div className="text-yellow-400 text-sm font-mono">
-                            {part.part_num}
-                        </div>
-                    </div>
-                </a>
-            </td>
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <div
-                        className="w-5 h-5 rounded border border-gray-600"
-                        style={{ backgroundColor: `#${part.color_rgb}` }}
-                    />
-                    <span className="text-gray-300">{part.color_name}</span>
-                </div>
-            </td>
-            <td className="px-4 py-3 text-gray-400">{part.category}</td>
-            <td className="px-4 py-3 text-center">
-                <span className="bg-gray-700 px-2 py-1 rounded text-white font-medium">
-                    {part.quantity}×
-                </span>
-                {part.is_spare && (
-                    <span className="ml-2 text-xs text-gray-400">(spare)</span>
-                )}
-            </td>
-            <td className="px-4 py-3 text-center">
-                <a
-                    href={part.bricklink_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 text-sm"
-                >
-                    BrickLink
-                </a>
-            </td>
-        </tr>
     );
 }
 

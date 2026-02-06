@@ -35,16 +35,16 @@ Route::get('/store', [App\Http\Controllers\PageController::class, 'store'])->nam
 // SEO-friendly model detail page: /mocs/{slug}-{id}
 // Examples: /mocs/millennium-falcon-75192, /mocs/custom-castle-12345
 Route::get('/mocs/{slug}', function ($slug) {
-    // Extract ID from slug (assuming format: "name-name-{id}")
-    $parts = explode('-', $slug);
-    $id = end($parts);
+  // Extract ID from slug (assuming format: "name-name-{id}")
+  $parts = explode('-', $slug);
+  $id = end($parts);
 
-    // Validate ID is numeric
-    if (!is_numeric($id)) {
-        abort(404);
-    }
+  // Validate ID is numeric
+  if (!is_numeric($id)) {
+    abort(404);
+  }
 
-    return Inertia::render('ModelDetail', ['id' => $id]);
+  return Inertia::render('ModelDetail', ['id' => $id]);
 })->where('slug', '[a-z0-9\-]+')->name('moc.show');
 
 /*
@@ -55,19 +55,19 @@ Route::get('/mocs/{slug}', function ($slug) {
 
 // Viewer - 3D model viewer
 Route::get('/viewer', function () {
-    return Inertia::render('Viewer');
+  return Inertia::render('Viewer');
 })->name('viewer');
 
 // Viewer with specific model (SEO-friendly slug)
 Route::get('/viewer/{slug}', function ($slug) {
-    $parts = explode('-', $slug);
-    $id = end($parts);
+  $parts = explode('-', $slug);
+  $id = end($parts);
 
-    if (!is_numeric($id)) {
-        abort(404);
-    }
+  if (!is_numeric($id)) {
+    abort(404);
+  }
 
-    return Inertia::render('Viewer', ['modelId' => $id]);
+  return Inertia::render('Viewer', ['modelId' => $id]);
 })->where('slug', '[a-z0-9\-]+')->name('viewer.model');
 
 /*
@@ -78,22 +78,36 @@ Route::get('/viewer/{slug}', function ($slug) {
 
 // Login page - for unauthenticated users
 Route::get('/login', function () {
-    return Inertia::render('Login');
+  return Inertia::render('Login');
 })->name('login');
 
 // Dashboard - user profile and model management
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+  return Inertia::render('Dashboard');
 })->name('dashboard');
+
+// Dashboard sub-pages (requires auth)
+Route::middleware(['auth'])->prefix('dashboard')->group(function () {
+  Route::get('/my-models', [App\Http\Controllers\DashboardController::class, 'myModels'])->name('dashboard.my-models');
+  Route::get('/submit', [App\Http\Controllers\DashboardController::class, 'submit'])->name('dashboard.submit');
+  Route::get('/sales', [App\Http\Controllers\DashboardController::class, 'sales'])->name('dashboard.sales');
+  Route::get('/settings', [App\Http\Controllers\DashboardController::class, 'settings'])->name('dashboard.settings');
+
+  // Flipping tracker
+  Route::get('/flipping', [App\Http\Controllers\FlippingPageController::class, 'index'])->name('dashboard.flipping');
+  Route::get('/flipping/{id}', [App\Http\Controllers\FlippingPageController::class, 'show'])
+    ->where('id', '[0-9]+')
+    ->name('dashboard.flipping.show');
+});
 
 // Cart - shopping cart
 Route::get('/cart', function () {
-    return Inertia::render('Cart');
+  return Inertia::render('Cart');
 })->name('cart');
 
 // Checkout success page
 Route::get('/checkout/success', function () {
-    return Inertia::render('CheckoutSuccess');
+  return Inertia::render('CheckoutSuccess');
 })->name('checkout.success');
 
 /*
@@ -104,25 +118,25 @@ Route::get('/checkout/success', function () {
 
 // Admin Panel Pages - requires authentication and admin role
 Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/dashboard', function () {
-        return Inertia::render('AdminDashboard');
-    })->name('admin.dashboard');
+  Route::get('/dashboard', function () {
+    return Inertia::render('AdminDashboard');
+  })->name('admin.dashboard');
 
-    Route::get('/users', function () {
-        return Inertia::render('AdminUsers');
-    })->name('admin.users');
+  Route::get('/users', function () {
+    return Inertia::render('AdminUsers');
+  })->name('admin.users');
 
-    Route::get('/models', function () {
-        return Inertia::render('AdminModels');
-    })->name('admin.models');
+  Route::get('/models', function () {
+    return Inertia::render('AdminModels');
+  })->name('admin.models');
 
-    Route::get('/sales', function () {
-        return Inertia::render('AdminSales');
-    })->name('admin.sales');
+  Route::get('/sales', function () {
+    return Inertia::render('AdminSales');
+  })->name('admin.sales');
 
-    Route::get('/data-import', function () {
-        return Inertia::render('AdminDataImport');
-    })->name('admin.data-import');
+  Route::get('/data-import', function () {
+    return Inertia::render('AdminDataImport');
+  })->name('admin.data-import');
 });
 
 /*
@@ -140,5 +154,5 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
 // Catch-all route for SPA - allows client-side routing if needed
 // Excludes defined routes, API, admin, catalog, static files, and ldraw folder
 Route::get('/{any}', function () {
-    return Inertia::render('Welcome');
-})->where('any', '^(?!api|ldraw|admin|catalog|store|mocs|viewer|dashboard|cart|checkout|auth)(?!.*\.(dat|ldr|mpd|js|css|png|jpg|svg|ico|woff2?|ttf)).*$');
+  return Inertia::render('Welcome');
+})->where('any', '^(?!api|ldraw|admin|catalog|store|mocs|viewer|dashboard|cart|checkout|auth|flipping)(?!.*\.(dat|ldr|mpd|js|css|png|jpg|svg|ico|woff2?|ttf)).*$');

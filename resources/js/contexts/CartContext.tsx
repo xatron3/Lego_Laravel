@@ -79,6 +79,11 @@ export function CartProvider({
         }
     }, [isAuthenticated]);
 
+    // Load cart when user is authenticated
+    useEffect(() => {
+        refreshCart();
+    }, [refreshCart]);
+
     const addToCart = async (modelId: number) => {
         if (!isAuthenticated) {
             throw new Error("You must be logged in to add items to your cart.");

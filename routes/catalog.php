@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\CatalogPageController;
 use Inertia\Inertia;
 
 /*
@@ -16,7 +17,15 @@ use Inertia\Inertia;
 
 // Catalog Pages (Inertia) - need web middleware for session
 Route::middleware('web')->group(function () {
-  Route::get('/catalog', [App\Http\Controllers\PageController::class, 'catalog'])->name('catalog');
+  // Main catalog discovery page
+  Route::get('/catalog', [CatalogPageController::class, 'index'])->name('catalog');
+
+  // Category listing pages
+  Route::get('/catalog/sets', [CatalogPageController::class, 'sets'])->name('catalog.sets');
+  Route::get('/catalog/mocs', [CatalogPageController::class, 'mocs'])->name('catalog.mocs');
+  Route::get('/catalog/parts', [CatalogPageController::class, 'parts'])->name('catalog.parts');
+  Route::get('/catalog/minifigs', [CatalogPageController::class, 'minifigs'])->name('catalog.minifigs');
+  Route::get('/catalog/themes', [CatalogPageController::class, 'themes'])->name('catalog.themes');
 
   // SEO-Friendly Catalog Detail Pages with descriptive URLs
   Route::get('/catalog/sets/{setNum}/{name?}', function ($setNum, $name = null) {
@@ -47,6 +56,7 @@ Route::middleware('web')->group(function () {
 // Catalog API Routes
 Route::prefix('api/catalog')->group(function () {
   Route::get('/stats', [CatalogController::class, 'stats']);
+  Route::get('/search', [CatalogController::class, 'searchAutocomplete']);
   Route::get('/sets', [CatalogController::class, 'sets']);
   Route::get('/sets/{setNum}', [CatalogController::class, 'showSet']);
   Route::get('/mocs', [CatalogController::class, 'mocs']);

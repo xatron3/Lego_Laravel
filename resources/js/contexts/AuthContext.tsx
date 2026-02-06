@@ -179,10 +179,12 @@ export function AuthProvider({
                 },
                 credentials: "same-origin",
             });
+            setUser(null);
+            // Redirect to home page after logout
+            router.visit("/", { replace: true });
         } catch (error) {
             console.error("Logout error:", error);
         }
-        setUser(null);
     };
 
     const hasRole = (role: User["role"]): boolean => {

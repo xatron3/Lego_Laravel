@@ -1,7 +1,7 @@
 const API_BASE = "/api";
 
 // Get CSRF token from meta tag or cookie
-function getCsrfToken(): string {
+export function getCsrfToken(): string {
     // Try meta tag first
     const metaToken = document
         .querySelector('meta[name="csrf-token"]')
@@ -20,7 +20,7 @@ function getCsrfToken(): string {
 }
 
 // Ensure CSRF cookie is set before making authenticated requests
-async function ensureCsrfCookie(): Promise<void> {
+export async function ensureCsrfCookie(): Promise<void> {
     await fetch("/sanctum/csrf-cookie", {
         credentials: "same-origin",
     });
@@ -534,9 +534,12 @@ export const api = {
         return response.json();
     },
 
-    async importRebrickableTable(
-        table: string,
-    ): Promise<{ message: string; imported: number }> {
+    async importRebrickableTable(table: string): Promise<{
+        message: string;
+        imported?: number;
+        job_id?: string;
+        table?: string;
+    }> {
         await ensureCsrfCookie();
         const response = await fetch(
             `${API_BASE}/admin/rebrickable/${table}/import-server`,
@@ -559,8 +562,9 @@ export const api = {
 
     async importAllRebrickableTables(): Promise<{
         message: string;
-        results: Record<string, number>;
-        errors: Record<string, string>;
+        results?: Record<string, number>;
+        errors?: Record<string, string>;
+        job_id?: string;
     }> {
         await ensureCsrfCookie();
         const response = await fetch(
@@ -578,6 +582,84 @@ export const api = {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.message || "Failed to import all");
+        }
+        return response.json();
+    },
+
+    async getRebrickableJobProgress(jobId: string): Promise<{
+        status: string;
+        progress: number | null;
+        message: string;
+        table?: string;
+        stats?: {
+            total: number;
+            processed: number;
+            imported: number;
+            skipped: number;
+        };
+        updated_at: string;
+    }> {
+        const response = await fetch(
+            `${API_BASE}/admin/rebrickable/progress/${jobId}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to fetch progress");
+        }
+        return response.json();
+    },
+
+    async getRebrickableJobs(): Promise<
+        Array<{
+            job_id: string;
+            status: string;
+            progress: number | null;
+            message: string;
+            table?: string;
+            stats?: {
+                total: number;
+                processed: number;
+                imported: number;
+                skipped: number;
+            };
+            updated_at: string;
+        }>
+    > {
+        const response = await fetch(`${API_BASE}/admin/rebrickable/jobs`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            throw new Error("Failed to fetch jobs");
+        }
+        return response.json();
+    },
+
+    async retryRebrickableJob(jobId: string): Promise<{
+        message: string;
+        job_id: string;
+        table?: string;
+    }> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/admin/rebrickable/retry/${jobId}`,
+            {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to retry job");
         }
         return response.json();
     },
@@ -714,8 +796,32 @@ export const api = {
 
     // ==================== Public Catalog API ====================
 
+    async searchCatalog(
+        query: string,
+        scope:
+            | "all"
+            | "sets"
+            | "mocs"
+            | "parts"
+            | "minifigs"
+            | "themes" = "all",
+    ): Promise<SearchResult[]> {
+        if (query.length < 2) return [];
+        const params = new URLSearchParams({ q: query, scope });
+        const response = await fetch(
+            `${API_BASE}/catalog/search?${params.toString()}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) return [];
+        return response.json();
+    },
+
     async getCatalogStats(): Promise<{
         sets: number;
+        mocs: number;
         parts: number;
         minifigs: number;
         colors: number;
@@ -1210,6 +1316,15 @@ export interface PaginatedResponse<T> {
     last_page: number;
     per_page: number;
     total: number;
+}
+
+export interface SearchResult {
+    type: "set" | "moc" | "part" | "minifig" | "theme";
+    id: string;
+    name: string;
+    subtitle: string;
+    image_url: string;
+    url: string;
 }
 
 export interface CatalogSet {

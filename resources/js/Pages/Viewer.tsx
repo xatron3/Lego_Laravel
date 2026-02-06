@@ -4,13 +4,12 @@ import { OrbitControls } from "@react-three/drei";
 import { useModelLoader } from "../hooks/useModelLoader";
 import StepControls from "../components/StepControls";
 import StepPreview from "../components/StepPreview";
-import PartsList from "../components/PartsList";
+import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
 import Scene from "../Scene";
 import { api, LegoModelData } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
-import PartsListOverlay, { PartInStep } from "../components/PartsListOverlay";
 import { getPartsForStep } from "../parser";
 import {
     captureCanvasScreenshot,
@@ -145,7 +144,7 @@ export default function Home({ modelId }: ViewerProps = {}) {
     };
 
     // Compute parts for current step with image URLs
-    const currentStepParts = useMemo<PartInStep[]>(() => {
+    const currentStepParts = useMemo<PartDisplayItem[]>(() => {
         if (steps.length === 0 || currentStep >= steps.length) {
             return [];
         }
@@ -161,6 +160,32 @@ export default function Home({ modelId }: ViewerProps = {}) {
             photoUrl: `https://cdn.rebrickable.com/media/parts/elements/${partCount.partId}.jpg`,
         }));
     }, [steps, currentStep]);
+
+    // Compute all parts across all steps
+    const allParts = useMemo<PartDisplayItem[]>(() => {
+        if (steps.length === 0) return [];
+
+        const partMap = new Map<string, PartDisplayItem>();
+        steps.forEach((step) => {
+            const partCounts = getPartsForStep(step);
+            partCounts.forEach((partCount) => {
+                const key = `${partCount.partId}_${partCount.colorId}`;
+                const existing = partMap.get(key);
+                if (existing) {
+                    existing.count += partCount.count;
+                } else {
+                    partMap.set(key, {
+                        partId: partCount.partId,
+                        colorId: partCount.colorId,
+                        count: partCount.count,
+                        imageUrl: `https://cdn.rebrickable.com/media/parts/ldraw/${partCount.colorId}/${partCount.partId}.png`,
+                        photoUrl: `https://cdn.rebrickable.com/media/parts/elements/${partCount.partId}.jpg`,
+                    });
+                }
+            });
+        });
+        return Array.from(partMap.values()).sort((a, b) => b.count - a.count);
+    }, [steps]);
 
     // Keyboard navigation for steps
     useEffect(() => {
@@ -306,11 +331,18 @@ export default function Home({ modelId }: ViewerProps = {}) {
 
                             {/* Parts List Overlay */}
                             {currentStepParts.length > 0 && (
-                                <PartsListOverlay
-                                    parts={currentStepParts}
-                                    stepNumber={currentStep + 1}
-                                    totalSteps={steps.length}
-                                />
+                                <div className="absolute top-4 left-4 w-96">
+                                    <PartsDisplay
+                                        parts={currentStepParts}
+                                        title="Parts for This Step"
+                                        subtitle={`Step ${currentStep + 1} of ${steps.length}`}
+                                        defaultView="grid"
+                                        showViewToggle={true}
+                                        showSearch={false}
+                                        allowedViews={["grid", "compact"]}
+                                        className="shadow-2xl border-2 border-gray-700"
+                                    />
+                                </div>
                             )}
 
                             <Canvas
@@ -480,9 +512,27 @@ export default function Home({ modelId }: ViewerProps = {}) {
 
                             {/* Parts List */}
                             <div className="p-4">
-                                <PartsList
-                                    steps={steps}
-                                    currentStep={currentStep}
+                                <PartsDisplay
+                                    parts={currentStepParts}
+                                    title="Current Step Parts"
+                                    subtitle={`Step ${currentStep + 1}`}
+                                    defaultView="compact"
+                                    showViewToggle={true}
+                                    showSearch={false}
+                                    allowedViews={["grid", "compact"]}
+                                />
+                            </div>
+
+                            {/* All Parts Summary */}
+                            <div className="p-4 border-t border-gray-700">
+                                <PartsDisplay
+                                    parts={allParts}
+                                    title="All Parts"
+                                    subtitle={`Total for entire model`}
+                                    defaultView="compact"
+                                    showViewToggle={true}
+                                    showSearch={true}
+                                    allowedViews={["grid", "table", "compact"]}
                                 />
                             </div>
                         </div>

@@ -27,10 +27,39 @@ export default function AdminDataImport() {
     const [tableSearch, setTableSearch] = useState("");
     const [importingTable, setImportingTable] = useState<string | null>(null);
     const [importingAll, setImportingAll] = useState(false);
+    const [activeJobId, setActiveJobId] = useState<string | null>(null); // Used to track current import job
+    const [jobProgress, setJobProgress] = useState<{
+        status: string;
+        progress: number | null;
+        message: string;
+        table?: string;
+        stats?: {
+            total: number;
+            processed: number;
+            imported: number;
+            skipped: number;
+        };
+    } | null>(null);
     const [importResults, setImportResults] = useState<{
         results: Record<string, number>;
         errors: Record<string, string>;
     } | null>(null);
+    const [importJobs, setImportJobs] = useState<
+        Array<{
+            job_id: string;
+            status: string;
+            progress: number | null;
+            message: string;
+            table?: string;
+            stats?: {
+                total: number;
+                processed: number;
+                imported: number;
+                skipped: number;
+            };
+            updated_at: string;
+        }>
+    >([]);
 
     const isAdmin = user?.role === "admin";
 
@@ -38,24 +67,37 @@ export default function AdminDataImport() {
         if (isAuthenticated && isAdmin) {
             loadRebrickableStats();
             loadRebrickableTables();
+            loadImportJobs();
         }
     }, [isAuthenticated, isAdmin]);
 
     const loadRebrickableStats = async () => {
         try {
             const stats = await api.getRebrickableStats();
-            setRebrickableStats(stats);
+            setRebrickableStats(stats || {});
         } catch (error) {
             console.error("Failed to load stats:", error);
+            setRebrickableStats({});
         }
     };
 
     const loadRebrickableTables = async () => {
         try {
             const tables = await api.getRebrickableTables();
-            setRebrickableTables(tables);
+            setRebrickableTables(tables || {});
         } catch (error) {
             console.error("Failed to load tables:", error);
+            setRebrickableTables({});
+        }
+    };
+
+    const loadImportJobs = async () => {
+        try {
+            const jobs = await api.getRebrickableJobs();
+            setImportJobs(jobs || []);
+        } catch (error) {
+            console.error("Failed to load jobs:", error);
+            setImportJobs([]);
         }
     };
 
@@ -82,17 +124,26 @@ export default function AdminDataImport() {
 
     const handleImportTable = async (table: string) => {
         setImportingTable(table);
+        setJobProgress(null);
         try {
             const result = await api.importRebrickableTable(table);
-            alert(
-                result.message ||
-                    `Imported ${result.imported} records for ${table}`,
-            );
-            await loadRebrickableStats();
+
+            if (result.job_id) {
+                // New job-based import
+                setActiveJobId(result.job_id);
+                pollJobProgress(result.job_id);
+            } else {
+                // Old synchronous import (fallback)
+                alert(
+                    result.message ||
+                        `Imported ${result.imported} records for ${table}`,
+                );
+                await loadRebrickableStats();
+                setImportingTable(null);
+            }
         } catch (error) {
             console.error("Failed to import table:", error);
             alert("Failed to import table");
-        } finally {
             setImportingTable(null);
         }
     };
@@ -100,19 +151,56 @@ export default function AdminDataImport() {
     const handleImportAll = async () => {
         setImportingAll(true);
         setImportResults(null);
+        setJobProgress(null);
         try {
             const result = await api.importAllRebrickableTables();
-            setImportResults({
-                results: result.results,
-                errors: result.errors,
-            });
-            await loadRebrickableStats();
+
+            if (result.job_id) {
+                // New job-based import
+                setActiveJobId(result.job_id);
+                pollJobProgress(result.job_id);
+            } else {
+                // Old synchronous import (fallback)
+                setImportResults({
+                    results: result.results || {},
+                    errors: result.errors || {},
+                });
+                await loadRebrickableStats();
+                setImportingAll(false);
+            }
         } catch (error) {
             console.error("Failed to import all:", error);
             alert("Failed to import all tables");
-        } finally {
             setImportingAll(false);
         }
+    };
+
+    const pollJobProgress = async (jobId: string) => {
+        const interval = setInterval(async () => {
+            try {
+                const progress = await api.getRebrickableJobProgress(jobId);
+                setJobProgress(progress);
+
+                if (progress.status === "completed") {
+                    clearInterval(interval);
+                    setImportingAll(false);
+                    setImportingTable(null);
+                    setActiveJobId(null);
+                    await loadRebrickableStats();
+                    await loadImportJobs();
+                    alert("Import completed successfully!");
+                } else if (progress.status === "failed") {
+                    clearInterval(interval);
+                    setImportingAll(false);
+                    setImportingTable(null);
+                    setActiveJobId(null);
+                    await loadImportJobs();
+                    alert("Import failed: " + progress.message);
+                }
+            } catch (error) {
+                console.error("Failed to fetch job progress:", error);
+            }
+        }, 2000); // Poll every 2 seconds
     };
 
     const handleClearAll = async () => {
@@ -144,6 +232,18 @@ export default function AdminDataImport() {
         } catch (error) {
             console.error("Failed to clear table:", error);
             alert("Failed to clear table");
+        }
+    };
+
+    const handleRetryJob = async (jobId: string) => {
+        try {
+            const result = await api.retryRebrickableJob(jobId);
+            setActiveJobId(result.job_id);
+            pollJobProgress(result.job_id);
+            await loadImportJobs();
+        } catch (error) {
+            console.error("Failed to retry job:", error);
+            alert("Failed to retry job");
         }
     };
 
@@ -250,7 +350,83 @@ export default function AdminDataImport() {
                                 </div>
                             </div>
 
-                            {/* Import Results */}
+                            {/* Import Results/Progress */}
+                            {jobProgress && (
+                                <div className="mt-4 p-4 bg-gray-700 rounded-lg">
+                                    <h4 className="text-white font-medium mb-2">
+                                        Import Progress
+                                        {activeJobId && (
+                                            <span className="ml-2 text-xs text-gray-400">
+                                                (Job: {activeJobId})
+                                            </span>
+                                        )}
+                                    </h4>
+                                    <div className="mb-2">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-gray-300">
+                                                Status: {jobProgress.status}
+                                            </span>
+                                            {jobProgress.progress !== null && (
+                                                <span className="text-yellow-400">
+                                                    {Math.round(
+                                                        jobProgress.progress,
+                                                    )}
+                                                    %
+                                                </span>
+                                            )}
+                                        </div>
+                                        {jobProgress.progress !== null && (
+                                            <div className="w-full bg-gray-600 rounded-full h-2">
+                                                <div
+                                                    className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
+                                                    style={{
+                                                        width: `${jobProgress.progress}%`,
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-gray-300 text-sm mb-2">
+                                        {jobProgress.message}
+                                    </p>
+                                    {jobProgress.stats && (
+                                        <div className="grid grid-cols-4 gap-2 text-xs">
+                                            <div className="bg-gray-600 p-2 rounded">
+                                                <div className="text-gray-400">
+                                                    Total
+                                                </div>
+                                                <div className="text-white font-medium">
+                                                    {jobProgress.stats.total.toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <div className="bg-gray-600 p-2 rounded">
+                                                <div className="text-gray-400">
+                                                    Processed
+                                                </div>
+                                                <div className="text-white font-medium">
+                                                    {jobProgress.stats.processed.toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <div className="bg-gray-600 p-2 rounded">
+                                                <div className="text-gray-400">
+                                                    Imported
+                                                </div>
+                                                <div className="text-green-400 font-medium">
+                                                    {jobProgress.stats.imported.toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <div className="bg-gray-600 p-2 rounded">
+                                                <div className="text-gray-400">
+                                                    Skipped
+                                                </div>
+                                                <div className="text-yellow-400 font-medium">
+                                                    {jobProgress.stats.skipped.toLocaleString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             {importResults && (
                                 <div className="mt-4 p-4 bg-gray-700 rounded-lg">
                                     <h4 className="text-white font-medium mb-2">
@@ -258,7 +434,7 @@ export default function AdminDataImport() {
                                     </h4>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                                         {Object.entries(
-                                            importResults.results,
+                                            importResults.results || {},
                                         ).map(([table, count]) => (
                                             <div
                                                 key={table}
@@ -273,14 +449,14 @@ export default function AdminDataImport() {
                                             </div>
                                         ))}
                                     </div>
-                                    {Object.keys(importResults.errors).length >
-                                        0 && (
+                                    {Object.keys(importResults.errors || {})
+                                        .length > 0 && (
                                         <div className="mt-2">
                                             <h5 className="text-red-400 font-medium mb-1">
                                                 Errors
                                             </h5>
                                             {Object.entries(
-                                                importResults.errors,
+                                                importResults.errors || {},
                                             ).map(([table, error]) => (
                                                 <div
                                                     key={table}
@@ -317,6 +493,154 @@ export default function AdminDataImport() {
                                     ),
                                 )}
                             </div>
+                        </div>
+
+                        {/* Job History */}
+                        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h3 className="text-lg font-semibold text-white mb-4">
+                                Import Job History
+                            </h3>
+                            {importJobs.length === 0 ? (
+                                <p className="text-gray-400 text-center py-4">
+                                    No import jobs yet
+                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {importJobs.map((job) => (
+                                        <div
+                                            key={job.job_id}
+                                            className="p-4 bg-gray-700 rounded-lg"
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <span
+                                                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                                            job.status ===
+                                                            "completed"
+                                                                ? "bg-green-900 text-green-300"
+                                                                : job.status ===
+                                                                    "failed"
+                                                                  ? "bg-red-900 text-red-300"
+                                                                  : job.status ===
+                                                                      "processing"
+                                                                    ? new Date().getTime() -
+                                                                          new Date(
+                                                                              job.updated_at,
+                                                                          ).getTime() >
+                                                                      300000
+                                                                        ? "bg-orange-900 text-orange-300"
+                                                                        : "bg-blue-900 text-blue-300"
+                                                                    : "bg-gray-600 text-gray-300"
+                                                        }`}
+                                                    >
+                                                        {job.status ===
+                                                            "processing" &&
+                                                        new Date().getTime() -
+                                                            new Date(
+                                                                job.updated_at,
+                                                            ).getTime() >
+                                                            300000
+                                                            ? "stuck"
+                                                            : job.status}
+                                                    </span>
+                                                    <span className="text-white font-medium">
+                                                        {job.table ||
+                                                            "All Tables"}
+                                                    </span>
+                                                    <span className="text-gray-400 text-sm">
+                                                        {new Date(
+                                                            job.updated_at,
+                                                        ).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                {(job.status === "failed" ||
+                                                    (job.status ===
+                                                        "processing" &&
+                                                        new Date().getTime() -
+                                                            new Date(
+                                                                job.updated_at,
+                                                            ).getTime() >
+                                                            300000)) && (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleRetryJob(
+                                                                job.job_id,
+                                                            )
+                                                        }
+                                                        className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium rounded transition-colors"
+                                                    >
+                                                        {job.status === "failed"
+                                                            ? "Retry"
+                                                            : "Retry (Stuck)"}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {job.progress !== null && (
+                                                <div className="mb-2">
+                                                    <div className="flex justify-between text-xs mb-1">
+                                                        <span className="text-gray-400">
+                                                            Progress
+                                                        </span>
+                                                        <span className="text-yellow-400">
+                                                            {Math.round(
+                                                                job.progress,
+                                                            )}
+                                                            %
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-600 rounded-full h-1.5">
+                                                        <div
+                                                            className="bg-yellow-500 h-1.5 rounded-full"
+                                                            style={{
+                                                                width: `${job.progress}%`,
+                                                            }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <p className="text-gray-300 text-sm">
+                                                {job.message}
+                                            </p>
+                                            {job.stats && (
+                                                <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+                                                    <div className="bg-gray-600 p-2 rounded">
+                                                        <div className="text-gray-400">
+                                                            Total
+                                                        </div>
+                                                        <div className="text-white font-medium">
+                                                            {job.stats.total.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-gray-600 p-2 rounded">
+                                                        <div className="text-gray-400">
+                                                            Processed
+                                                        </div>
+                                                        <div className="text-white font-medium">
+                                                            {job.stats.processed.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-gray-600 p-2 rounded">
+                                                        <div className="text-gray-400">
+                                                            Imported
+                                                        </div>
+                                                        <div className="text-green-400 font-medium">
+                                                            {job.stats.imported.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-gray-600 p-2 rounded">
+                                                        <div className="text-gray-400">
+                                                            Skipped
+                                                        </div>
+                                                        <div className="text-yellow-400 font-medium">
+                                                            {job.stats.skipped.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Individual Table Import */}

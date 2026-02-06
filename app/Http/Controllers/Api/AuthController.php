@@ -96,7 +96,13 @@ class AuthController extends Controller
    */
   public function logout(Request $request): JsonResponse
   {
+    // Logout from both guards to ensure complete logout
     Auth::guard('web')->logout();
+    
+    // Also revoke all Sanctum tokens if any exist
+    if ($request->user()) {
+      $request->user()->tokens()->delete();
+    }
 
     $request->session()->invalidate();
     $request->session()->regenerateToken();
