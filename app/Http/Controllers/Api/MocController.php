@@ -263,8 +263,12 @@ class MocController extends Controller
     // Add display thumbnail
     $moc->display_thumbnail = $moc->display_thumbnail;
 
-    // Hide LDR content if user doesn't have access
-    if (!$moc->canAccessContent($request->user())) {
+    // Check if this is a Pro demo model (publicly accessible for demonstration)
+    $proDemoMocIds = \App\Models\SiteSetting::getValue('pro_demo_moc_ids', []);
+    $isDemoModel = in_array($moc->id, $proDemoMocIds);
+
+    // Hide LDR content if user doesn't have access AND it's not a demo model
+    if (!$isDemoModel && !$moc->canAccessContent($request->user())) {
       $moc->makeHidden('ldr_content');
     } else {
       $moc->makeVisible('ldr_content');

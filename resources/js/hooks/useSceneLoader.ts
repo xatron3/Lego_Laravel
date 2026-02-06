@@ -66,7 +66,7 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
     const missingPartsRef = useRef<string[]>([]);
 
     useEffect(() => {
-        if (!modelText) {
+        if (!modelText || modelText.trim().length === 0) {
             // Dispose old model before clearing
             if (model) {
                 disposeObject(model);
@@ -74,6 +74,7 @@ export function useSceneLoader(modelText: string | null): UseSceneLoaderResult {
             setModel(null);
             setMissingParts([]);
             setLoadingProgress({ loaded: 0, total: 0 });
+            setError(null);
             return;
         }
 

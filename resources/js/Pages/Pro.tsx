@@ -71,6 +71,15 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
             setIsLoadingModel(true);
             try {
                 const fullModel = await api.getModel(selectedDemo.id);
+
+                // Validate that ldr_content is available
+                if (!fullModel.ldr_content) {
+                    console.error("Model does not have accessible LDR content");
+                    throw new Error(
+                        "Model content not accessible. Please configure this model as a Pro demo model in admin settings.",
+                    );
+                }
+
                 const file = new File(
                     [fullModel.ldr_content],
                     fullModel.file_name || "model.ldr",
@@ -81,6 +90,11 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
                 setIsPlaying(true);
             } catch (error) {
                 console.error("Failed to load demo model:", error);
+                alert(
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to load demo model",
+                );
             } finally {
                 setIsLoadingModel(false);
             }

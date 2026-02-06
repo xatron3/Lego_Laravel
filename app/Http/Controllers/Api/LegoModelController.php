@@ -128,8 +128,12 @@ class LegoModelController extends Controller
       $model->parts_count = count($parts);
     }
 
-    // If user doesn't have content access, remove LDR content from response
-    if (!$legoModel->canAccessContent($request->user())) {
+    // Check if this is a Pro demo model (publicly accessible for demonstration)
+    $proDemoMocIds = \App\Models\SiteSetting::getValue('pro_demo_moc_ids', []);
+    $isDemoModel = in_array($legoModel->id, $proDemoMocIds);
+
+    // If user doesn't have content access AND it's not a demo model, remove LDR content from response
+    if (!$isDemoModel && !$legoModel->canAccessContent($request->user())) {
       $model->makeHidden('ldr_content');
     }
 

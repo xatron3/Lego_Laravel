@@ -285,7 +285,7 @@ export default function Header({
 
                                 {/* Submenu */}
                                 {item.submenu && activeMenu === item.label && (
-                                    <div className="absolute top-full left-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden animate-slideDown">
+                                    <div className="absolute top-full left-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden animate-slideDown z-50">
                                         {item.submenu.map((subItem, index) => (
                                             <Link
                                                 key={subItem.href}
