@@ -3,6 +3,7 @@ import { Link } from "@inertiajs/react";
 import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { api, OrderData } from "../api";
 
 interface CheckoutSuccessProps {
@@ -230,6 +231,8 @@ export default function CheckoutSuccess({ session_id }: CheckoutSuccessProps) {
                 isOpen={showAuthModal}
                 onClose={() => setShowAuthModal(false)}
             />
+
+            <Footer />
         </div>
     );
 }

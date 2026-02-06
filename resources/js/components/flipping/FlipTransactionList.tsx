@@ -1,5 +1,7 @@
 import { Link } from "@inertiajs/react";
 import type { FlipTransactionData } from "../../Pages/Flipping";
+import { useAuth } from "../../contexts/AuthContext";
+import { formatCurrency, getCurrencySettings } from "../../utils/currency";
 
 interface PaginatedData<T> {
     data: T[];
@@ -12,13 +14,6 @@ interface PaginatedData<T> {
 
 interface FlipTransactionListProps {
     transactions: PaginatedData<FlipTransactionData>;
-}
-
-function formatCurrency(value: string | number): string {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-    }).format(typeof value === "string" ? parseFloat(value) : value);
 }
 
 function formatDate(dateStr: string): string {
@@ -140,8 +135,10 @@ function ItemsSummary({ items }: { items: FlipTransactionData["items"] }) {
 /** Shows sub-sells summary for a buy transaction */
 function SubSellsSummary({
     transaction,
+    currencySettings,
 }: {
     transaction: FlipTransactionData;
+    currencySettings: any;
 }) {
     const subTransactions = transaction.sub_transactions || [];
 
@@ -155,7 +152,7 @@ function SubSellsSummary({
     return (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <svg
-                className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0"
+                className="w-3.5 h-3.5 text-emerald-500 shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -172,7 +169,11 @@ function SubSellsSummary({
                 {subTransactions.length !== 1 ? "s" : ""}
             </span>
             <span className="text-xs text-gray-500">
-                ({formatCurrency(totalRevenue)} revenue)
+                (
+                {formatCurrency(totalRevenue, currencySettings, {
+                    precise: true,
+                })}{" "}
+                revenue)
             </span>
         </div>
     );
@@ -181,6 +182,9 @@ function SubSellsSummary({
 export default function FlipTransactionList({
     transactions,
 }: FlipTransactionListProps) {
+    const { user } = useAuth();
+    const currencySettings = getCurrencySettings(user);
+
     if (transactions.total === 0) {
         return (
             <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-12 text-center">
@@ -268,20 +272,31 @@ export default function FlipTransactionList({
                                         >
                                             {t.title}
                                         </Link>
-                                        <SubSellsSummary transaction={t} />
+                                        <SubSellsSummary
+                                            transaction={t}
+                                            currencySettings={currencySettings}
+                                        />
                                     </td>
                                     <td className="px-4 py-3 max-w-xs">
                                         <ItemsSummary items={t.items} />
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         <span className="font-semibold text-blue-400">
-                                            {formatCurrency(cost)}
+                                            {formatCurrency(
+                                                cost,
+                                                currencySettings,
+                                                { precise: true },
+                                            )}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         {revenue > 0 ? (
                                             <span className="font-semibold text-emerald-400">
-                                                {formatCurrency(revenue)}
+                                                {formatCurrency(
+                                                    revenue,
+                                                    currencySettings,
+                                                    { precise: true },
+                                                )}
                                             </span>
                                         ) : (
                                             <span className="text-gray-500">
@@ -345,11 +360,20 @@ export default function FlipTransactionList({
                                 </div>
                                 <div className="text-right">
                                     <span className="font-bold text-blue-400">
-                                        {formatCurrency(cost)}
+                                        {formatCurrency(
+                                            cost,
+                                            currencySettings,
+                                            { precise: true },
+                                        )}
                                     </span>
                                     {revenue > 0 && (
                                         <div className="text-sm text-emerald-400">
-                                            → {formatCurrency(revenue)}
+                                            →{" "}
+                                            {formatCurrency(
+                                                revenue,
+                                                currencySettings,
+                                                { precise: true },
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -357,7 +381,10 @@ export default function FlipTransactionList({
                             <h3 className="text-white font-medium mb-1">
                                 {t.title}
                             </h3>
-                            <SubSellsSummary transaction={t} />
+                            <SubSellsSummary
+                                transaction={t}
+                                currencySettings={currencySettings}
+                            />
                             <div className="flex items-center justify-between text-sm mt-1">
                                 <span className="text-gray-500">
                                     {formatDate(t.transaction_date)}

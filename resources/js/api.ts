@@ -489,6 +489,13 @@ export const api = {
         current_password?: string;
         password?: string;
         password_confirmation?: string;
+        settings?: {
+            flipping?: {
+                currency_symbol?: string;
+                currency_placement?: "left" | "right";
+            };
+            [key: string]: any;
+        };
     }): Promise<{ message: string; user: any }> {
         await ensureCsrfCookie();
         const response = await fetch(`${API_BASE}/user/settings`, {

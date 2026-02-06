@@ -5,6 +5,7 @@ import { useModelLoader } from "../hooks/useModelLoader";
 import StepControls from "../components/StepControls";
 import StepPreview from "../components/StepPreview";
 import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
+import Footer from "../components/Footer";
 import Scene from "../Scene";
 import { api, LegoModelData } from "../api";
 import { useAuth } from "../contexts/AuthContext";

@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import Scene from "../Scene";
 import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
 import { api, LegoModelData, InventoryPartData } from "../api";
@@ -682,6 +683,8 @@ function ErrorState() {
             >
                 Back to Store
             </button>
+
+            <Footer />
         </div>
     );
 }

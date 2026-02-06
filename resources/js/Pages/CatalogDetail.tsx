@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
+import Footer from "../components/Footer";
 import LoadingState from "../components/catalog/LoadingState";
 import ErrorState from "../components/catalog/ErrorState";
 import SetDetail from "../components/catalog/SetDetail";
@@ -163,6 +164,8 @@ export default function CatalogDetail({ type, id }: Props) {
                     </>
                 )}
             </main>
+
+            <Footer />
         </div>
     );
 }

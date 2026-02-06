@@ -1,4 +1,6 @@
 import type { FlipStatsData } from "../../Pages/Flipping";
+import { useAuth } from "../../contexts/AuthContext";
+import { formatCurrency, getCurrencySettings } from "../../utils/currency";
 
 interface SetPerformance {
     set_num: string;
@@ -24,20 +26,13 @@ interface FlipReportsProps {
     platformStats?: PlatformStats[];
 }
 
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(value);
-}
-
 export default function FlipReports({
     stats,
     topSets = [],
     platformStats = [],
 }: FlipReportsProps) {
+    const { user } = useAuth();
+    const currencySettings = getCurrencySettings(user);
     // Group monthly trend data by month
     const monthlyTrendMap = new Map<string, { buys: number; sells: number }>();
     stats.monthly_trend?.forEach((item) => {
@@ -128,6 +123,7 @@ export default function FlipReports({
                             stats.completed_matches > 0
                                 ? stats.total_profit / stats.completed_matches
                                 : 0,
+                            currencySettings,
                         )}
                     </div>
                     <p className="text-sm text-gray-400">
@@ -268,7 +264,10 @@ export default function FlipReports({
                                     </div>
                                     <div className="text-right">
                                         <div className="text-emerald-400 font-bold">
-                                            {formatCurrency(set.total_profit)}
+                                            {formatCurrency(
+                                                set.total_profit,
+                                                currencySettings,
+                                            )}
                                         </div>
                                     </div>
                                 </div>

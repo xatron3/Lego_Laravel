@@ -63,6 +63,10 @@ class DashboardController extends Controller
       'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
       'current_password' => 'required_with:password|string',
       'password' => 'nullable|string|min:8|confirmed',
+      'settings' => 'sometimes|array',
+      'settings.flipping' => 'sometimes|array',
+      'settings.flipping.currency_symbol' => 'sometimes|string|max:10',
+      'settings.flipping.currency_placement' => 'sometimes|in:left,right',
     ]);
 
     // Verify current password if changing password
@@ -85,11 +89,16 @@ class DashboardController extends Controller
       $user->email = $validated['email'];
     }
 
+    if (isset($validated['settings'])) {
+      $currentSettings = $user->settings ?? [];
+      $user->settings = array_merge($currentSettings, $validated['settings']);
+    }
+
     $user->save();
 
     return response()->json([
       'message' => 'Settings updated successfully.',
-      'user' => $user->only(['id', 'name', 'email', 'avatar', 'role']),
+      'user' => $user->only(['id', 'name', 'email', 'avatar', 'role', 'settings']),
     ]);
   }
 }

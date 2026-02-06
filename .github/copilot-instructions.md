@@ -234,6 +234,136 @@ When writing or modifying code, always adhere to SOLID principles:
 - Components use Tailwind CSS 4 with dark theme (gray-900 background)
 - 3D canvas uses `@react-three/fiber` with `OrbitControls`
 
+## User Settings Pattern
+
+The application uses a flexible key-value settings system for user preferences stored as JSON in the database.
+
+### Database Structure
+
+Users table includes a `settings` JSON column for flexible user preferences:
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->json('settings')->nullable();
+});
+```
+
+### Backend Implementation
+
+**User Model** (`app/Models/User.php`):
+
+- Settings field is cast to array
+- Provides helper methods for accessing nested settings:
+
+```php
+protected function casts(): array
+{
+    return [
+        'settings' => 'array',
+        // ... other casts
+    ];
+}
+
+public function getSetting(string $key, mixed $default = null): mixed
+{
+    return data_get($this->settings, $key, $default);
+}
+
+public function setSetting(string $key, mixed $value): void
+{
+    $settings = $this->settings ?? [];
+    data_set($settings, $key, $value);
+    $this->settings = $settings;
+}
+
+// Feature-specific settings accessor with defaults
+public function getFlippingSettings(): array
+{
+    $defaults = [
+        'currency_symbol' => '$',
+        'currency_placement' => 'left',
+    ];
+    return array_merge($defaults, $this->getSetting('flipping', []));
+}
+```
+
+**Settings API** (`app/Http/Controllers/Api/DashboardController.php`):
+
+- Validates and updates nested settings via `PUT /api/user/settings`:
+
+```php
+$validated = $request->validate([
+    'settings' => 'sometimes|array',
+    'settings.flipping' => 'sometimes|array',
+    'settings.flipping.currency_symbol' => 'sometimes|string|max:10',
+    'settings.flipping.currency_placement' => 'sometimes|in:left,right',
+]);
+
+if (isset($validated['settings'])) {
+    $currentSettings = $user->settings ?? [];
+    $user->settings = array_merge($currentSettings, $validated['settings']);
+}
+```
+
+### Frontend Implementation
+
+**Shared via Inertia** (`app/Http/Middleware/HandleInertiaRequests.php`):
+Settings are automatically available in all components via the auth context:
+
+```php
+'auth' => [
+    'user' => $request->user() ? [
+        // ... other user fields
+        'settings' => $request->user()->settings ?? [],
+    ] : null,
+],
+```
+
+**Utility Functions** (`resources/js/utils/currency.ts`):
+Feature-specific utilities extract and apply settings:
+
+```typescript
+export function getCurrencySettings(user: any): CurrencySettings {
+    if (!user?.settings?.flipping) {
+        return defaultSettings;
+    }
+    return {
+        currency_symbol: user.settings.flipping.currency_symbol ?? "$",
+        currency_placement: user.settings.flipping.currency_placement ?? "left",
+    };
+}
+
+export function formatCurrency(
+    value: number,
+    settings?: Partial<CurrencySettings>,
+): string {
+    const config = { ...defaultSettings, ...settings };
+    // Apply formatting based on config
+}
+```
+
+**Settings Page** (`resources/js/Pages/Dashboard/Settings.tsx`):
+
+- Loads settings from user context
+- Updates via API call to `/api/user/settings`
+- Organized by feature sections (Profile, Flipping, etc.)
+
+### Adding New Settings
+
+1. **No migration needed** - JSON field is flexible
+2. **Add validation** to `DashboardController::updateSettings()`
+3. **Add accessor** to User model for feature-specific settings with defaults
+4. **Create utility** in `resources/js/utils/` if formatting/processing needed
+5. **Add UI** to Settings page with appropriate inputs
+6. **Use settings** in feature components via `useAuth()` hook
+
+### Current Settings
+
+**Flipping Tracker** (`settings.flipping`):
+
+- `currency_symbol` (string): Currency symbol to display (e.g., $, €, £)
+- `currency_placement` ('left' | 'right'): Position of currency symbol
+
 ## Testing
 
 - PHPUnit for backend (`tests/Feature/`, `tests/Unit/`)

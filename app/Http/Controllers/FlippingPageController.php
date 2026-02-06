@@ -129,12 +129,12 @@ class FlippingPageController extends Controller
     $totalShipping = (float) FlipTransaction::forUser($userId)->sum('shipping_cost');
     $totalFees = (float) FlipTransaction::forUser($userId)->sum('fees');
 
-    // Calculate profit from matched transactions
+    // Calculate profit from matched transactions (FlipMatch)
     $matches = FlipMatch::with('buyTransaction', 'sellTransaction')
       ->whereHas('buyTransaction', fn($q) => $q->where('user_id', $userId))
       ->get();
 
-    $totalProfit = $matches->sum(function ($m) {
+    $matchProfit = $matches->sum(function ($m) {
       $sellAmount = (float) $m->sell_amount;
       $buyAmount = (float) $m->buy_amount;
       $buyTransaction = $m->buyTransaction;
@@ -152,16 +152,44 @@ class FlippingPageController extends Controller
       return $sellAmount - $allocatedSellCosts - $buyAmount - $allocatedBuyCosts;
     });
 
+    // Calculate profit from sub-transactions (sells attached to parent buys)
+    $parentBuys = FlipTransaction::forUser($userId)
+      ->buys()
+      ->parents()
+      ->with('subTransactions')
+      ->get();
+
+    $subTransactionProfit = $parentBuys->sum(function ($buy) {
+      $sellTotal = (float) $buy->subTransactions->sum('price');
+      if ($sellTotal <= 0) {
+        return 0;
+      }
+
+      $subFees = (float) $buy->subTransactions->sum('fees');
+      $subShipping = (float) $buy->subTransactions->sum('shipping_cost');
+      $buyCost = (float) $buy->price + (float) $buy->shipping_cost + (float) $buy->fees;
+
+      return $sellTotal - $buyCost - $subFees - $subShipping;
+    });
+
+    // Total profit includes both match-based and sub-transaction profit
+    $totalProfit = $matchProfit + $subTransactionProfit;
+
     $totalMatchedBuy = (float) $matches->sum('buy_amount');
-    $completedMatches = $matches->count(); // Number of completed flips
+    $totalSubTransactionBuy = (float) $parentBuys->filter(fn($b) => $b->subTransactions->isNotEmpty())->sum('price');
+    $totalInvestedInFlips = $totalMatchedBuy + $totalSubTransactionBuy;
+
+    $completedMatches = $matches->count(); // Number of completed flips via matches
+    $completedSubFlips = $parentBuys->filter(fn($b) => $b->subTransactions->isNotEmpty())->count();
+    $totalCompletedFlips = $completedMatches + $completedSubFlips;
 
     $inventoryValue = (float) FlipTransaction::forUser($userId)
       ->buys()
       ->whereIn('status', ['open', 'partial'])
       ->sum('price');
 
-    $avgMargin = $totalMatchedBuy > 0
-      ? ($totalProfit / $totalMatchedBuy) * 100
+    $avgMargin = $totalInvestedInFlips > 0
+      ? ($totalProfit / $totalInvestedInFlips) * 100
       : 0;
 
     // Monthly trend
@@ -194,7 +222,7 @@ class FlippingPageController extends Controller
       'open_buys' => FlipTransaction::forUser($userId)->buys()->open()->count(),
       'open_sells' => FlipTransaction::forUser($userId)->sells()->open()->count(),
       'complete_count' => FlipTransaction::forUser($userId)->complete()->count(),
-      'completed_matches' => $completedMatches, // Use this for avg profit/flip
+      'completed_matches' => $totalCompletedFlips, // Total flips (matches + sub-transactions)
       'monthly_trend' => $monthlyTrend,
     ];
   }
@@ -204,14 +232,14 @@ class FlippingPageController extends Controller
    */
   private function getTopSets(int $userId): array
   {
+    $setPerformance = [];
+
+    // 1. Get sets from FlipMatch records
     $matches = FlipMatch::with(['buyTransaction.items.set', 'sellTransaction.items'])
       ->whereHas('buyTransaction', fn($q) => $q->where('user_id', $userId))
       ->get();
 
-    $setPerformance = [];
-
     foreach ($matches as $match) {
-      // Skip if buyTransaction or items are missing
       if (!$match->buyTransaction || !$match->buyTransaction->items) {
         continue;
       }
@@ -246,6 +274,47 @@ class FlippingPageController extends Controller
           $setPerformance[$setNum]['total_flips']++;
           $setPerformance[$setNum]['total_profit'] += $profit;
           $setPerformance[$setNum]['total_sold'] += $sellAmount;
+        }
+      }
+    }
+
+    // 2. Get sets from sub-transaction system (parent buys with sub-sells)
+    $parentBuys = FlipTransaction::forUser($userId)
+      ->buys()
+      ->parents()
+      ->with(['items.set', 'subTransactions.items.set'])
+      ->get();
+
+    foreach ($parentBuys as $buy) {
+      if ($buy->subTransactions->isEmpty() || $buy->items->isEmpty()) {
+        continue;
+      }
+
+      foreach ($buy->items as $item) {
+        if ($item->item_type === 'set' && $item->set_num) {
+          $setNum = $item->set_num;
+
+          if (!isset($setPerformance[$setNum])) {
+            $setPerformance[$setNum] = [
+              'set_num' => $setNum,
+              'set_name' => $item->set?->name ?? 'Set ' . $setNum,
+              'total_flips' => 0,
+              'total_profit' => 0,
+              'total_sold' => 0,
+            ];
+          }
+
+          // Calculate profit for this sub-transaction flip
+          $sellTotal = (float) $buy->subTransactions->sum('price');
+          $subFees = (float) $buy->subTransactions->sum('fees');
+          $subShipping = (float) $buy->subTransactions->sum('shipping_cost');
+          $buyCost = (float) $buy->price + (float) $buy->shipping_cost + (float) $buy->fees;
+
+          $profit = $sellTotal - $buyCost - $subFees - $subShipping;
+
+          $setPerformance[$setNum]['total_flips']++;
+          $setPerformance[$setNum]['total_profit'] += $profit;
+          $setPerformance[$setNum]['total_sold'] += $sellTotal;
         }
       }
     }
@@ -301,7 +370,7 @@ class FlippingPageController extends Controller
         })
         ->get();
 
-      $profit = $matches->sum(function ($m) {
+      $matchProfit = $matches->sum(function ($m) {
         $sellAmount = (float) $m->sell_amount;
         $buyAmount = (float) $m->buy_amount;
         $buyTransaction = $m->buyTransaction;
@@ -316,13 +385,36 @@ class FlippingPageController extends Controller
         return $sellAmount - $allocatedSellCosts - $buyAmount - $allocatedBuyCosts;
       });
 
+      // Calculate platform-specific profit from sub-transactions
+      $parentBuys = FlipTransaction::forUser($userId)
+        ->buys()
+        ->parents()
+        ->where('platform', $platform)
+        ->with('subTransactions')
+        ->get();
+
+      $subProfit = $parentBuys->sum(function ($buy) {
+        $sellTotal = (float) $buy->subTransactions->sum('price');
+        if ($sellTotal <= 0) {
+          return 0;
+        }
+
+        $subFees = (float) $buy->subTransactions->sum('fees');
+        $subShipping = (float) $buy->subTransactions->sum('shipping_cost');
+        $buyCost = (float) $buy->price + (float) $buy->shipping_cost + (float) $buy->fees;
+
+        return $sellTotal - $buyCost - $subFees - $subShipping;
+      });
+
+      $totalProfit = $matchProfit + $subProfit;
+
       $platformStats[] = [
         'platform' => $platform,
         'buy_count' => $buys->count(),
         'sell_count' => $sells->count(),
         'total_buy_amount' => round((float) $totalBuyAmount, 2),
         'total_sell_amount' => round((float) $totalSellAmount, 2),
-        'profit' => round($profit, 2),
+        'profit' => round($totalProfit, 2),
       ];
     }
 

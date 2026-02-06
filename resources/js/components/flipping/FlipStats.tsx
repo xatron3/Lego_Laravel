@@ -1,26 +1,14 @@
 import type { FlipStatsData } from "../../Pages/Flipping";
+import { useAuth } from "../../contexts/AuthContext";
+import { formatCurrency, getCurrencySettings } from "../../utils/currency";
 
 interface FlipStatsProps {
     stats: FlipStatsData;
 }
 
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(value);
-}
-
-function formatCurrencyPrecise(value: number): string {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-    }).format(value);
-}
-
 export default function FlipStats({ stats }: FlipStatsProps) {
+    const { user } = useAuth();
+    const currencySettings = getCurrencySettings(user);
     const profitColor =
         stats.total_profit > 0
             ? "text-emerald-400"
@@ -38,7 +26,7 @@ export default function FlipStats({ stats }: FlipStatsProps) {
     const cards = [
         {
             label: "Total Spent",
-            value: formatCurrency(stats.total_buy_amount),
+            value: formatCurrency(stats.total_buy_amount, currencySettings),
             sub: `${stats.total_buys} buys`,
             icon: (
                 <svg
@@ -60,7 +48,7 @@ export default function FlipStats({ stats }: FlipStatsProps) {
         },
         {
             label: "Total Revenue",
-            value: formatCurrency(stats.total_sell_amount),
+            value: formatCurrency(stats.total_sell_amount, currencySettings),
             sub: `${stats.total_sells} sales`,
             icon: (
                 <svg
@@ -82,7 +70,9 @@ export default function FlipStats({ stats }: FlipStatsProps) {
         },
         {
             label: "Profit",
-            value: formatCurrencyPrecise(stats.total_profit),
+            value: formatCurrency(stats.total_profit, currencySettings, {
+                precise: true,
+            }),
             sub: `${stats.avg_margin > 0 ? "+" : ""}${stats.avg_margin}% margin`,
             icon: (
                 <svg

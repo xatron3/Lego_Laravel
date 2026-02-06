@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
+import Footer from "../components/Footer";
 import CatalogNav from "../components/catalog/CatalogNav";
 import SearchAutocomplete from "../components/catalog/SearchAutocomplete";
 import ViewToggle from "../components/catalog/ViewToggle";
@@ -258,6 +259,8 @@ export default function CatalogParts({
                     onPageChange={setPage}
                 />
             </main>
+
+            <Footer />
         </div>
     );
 }

@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { LegoModelData } from "../api";
 import { mocUrl } from "../utils/seoUrls";
 
@@ -411,6 +412,8 @@ export default function Store({
                 isOpen={showAuthModal}
                 onClose={() => setShowAuthModal(false)}
             />
+
+            <Footer />
         </div>
     );
 }

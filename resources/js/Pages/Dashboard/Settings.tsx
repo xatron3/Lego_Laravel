@@ -7,12 +7,22 @@ export default function Settings() {
     const { user } = useAuth();
     const [settingsName, setSettingsName] = useState(user?.name || "");
     const [settingsEmail, setSettingsEmail] = useState(user?.email || "");
+    const [currencySymbol, setCurrencySymbol] = useState(
+        user?.settings?.flipping?.currency_symbol || "$",
+    );
+    const [currencyPlacement, setCurrencyPlacement] = useState<
+        "left" | "right"
+    >(user?.settings?.flipping?.currency_placement || "left");
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     useEffect(() => {
         if (user) {
             setSettingsName(user.name);
             setSettingsEmail(user.email);
+            setCurrencySymbol(user.settings?.flipping?.currency_symbol || "$");
+            setCurrencyPlacement(
+                user.settings?.flipping?.currency_placement || "left",
+            );
         }
     }, [user]);
 
@@ -22,6 +32,12 @@ export default function Settings() {
             await api.updateSettings({
                 name: settingsName,
                 email: settingsEmail,
+                settings: {
+                    flipping: {
+                        currency_symbol: currencySymbol,
+                        currency_placement: currencyPlacement,
+                    },
+                },
             });
             alert("Settings saved successfully!");
         } catch (error: any) {
@@ -79,6 +95,73 @@ export default function Settings() {
                                     ? "Saving..."
                                     : "Save Changes"}
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Flipping Settings */}
+                    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h2 className="text-lg font-semibold text-white mb-4">
+                            Flipping Tracker Settings
+                        </h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-2">
+                                    Currency Symbol
+                                </label>
+                                <input
+                                    type="text"
+                                    value={currencySymbol}
+                                    onChange={(e) =>
+                                        setCurrencySymbol(e.target.value)
+                                    }
+                                    placeholder="$"
+                                    maxLength={10}
+                                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                />
+                                <p className="text-gray-500 text-xs mt-1">
+                                    Enter your preferred currency symbol (e.g.,
+                                    $, €, £, ¥)
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-2">
+                                    Currency Placement
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() =>
+                                            setCurrencyPlacement("left")
+                                        }
+                                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                                            currencyPlacement === "left"
+                                                ? "bg-yellow-500/20 border-yellow-500 text-yellow-400"
+                                                : "bg-gray-700 border-gray-600 text-gray-400 hover:border-gray-500"
+                                        }`}
+                                    >
+                                        <div className="text-sm mb-1">Left</div>
+                                        <div className="text-xs opacity-75">
+                                            {currencySymbol}100
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            setCurrencyPlacement("right")
+                                        }
+                                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                                            currencyPlacement === "right"
+                                                ? "bg-yellow-500/20 border-yellow-500 text-yellow-400"
+                                                : "bg-gray-700 border-gray-600 text-gray-400 hover:border-gray-500"
+                                        }`}
+                                    >
+                                        <div className="text-sm mb-1">
+                                            Right
+                                        </div>
+                                        <div className="text-xs opacity-75">
+                                            100{currencySymbol}
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

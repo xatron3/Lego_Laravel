@@ -45,6 +45,7 @@ class HandleInertiaRequests extends Middleware
           'role' => $request->user()->role,
           'avatar' => $request->user()->avatar,
           'created_at' => $request->user()->created_at?->toISOString(),
+          'settings' => $request->user()->settings ?? [],
         ] : null,
       ],
       'cart' => [

@@ -8,6 +8,13 @@ export interface User {
     role: "normal" | "submitter" | "mod" | "admin";
     avatar: string | null;
     created_at?: string;
+    settings?: {
+        flipping?: {
+            currency_symbol?: string;
+            currency_placement?: "left" | "right";
+        };
+        [key: string]: any;
+    };
 }
 
 interface AuthContextType {

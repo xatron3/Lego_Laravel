@@ -2,6 +2,7 @@
 import { Link } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
+import Footer from "../components/Footer";
 import CatalogNav from "../components/catalog/CatalogNav";
 import SearchAutocomplete from "../components/catalog/SearchAutocomplete";
 import SetCard from "../components/catalog/SetCard";
@@ -237,6 +238,8 @@ export default function Catalog({
                     </Section>
                 )}
             </main>
+
+            <Footer />
         </div>
     );
 }
