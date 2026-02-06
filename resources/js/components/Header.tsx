@@ -14,7 +14,8 @@ interface HeaderProps {
         | "catalog"
         | "viewer"
         | "dashboard"
-        | "flipping";
+        | "flipping"
+        | "community";
 }
 
 interface SubMenuItem {
@@ -162,6 +163,15 @@ export default function Header({
             ],
         },
         ...(isAuthenticated ? [] : []),
+        ...(isAuthenticated
+            ? [
+                  {
+                      label: "Community",
+                      href: "/community",
+                      page: "community",
+                  },
+              ]
+            : []),
         ...(!isPro
             ? [
                   {
@@ -223,7 +233,7 @@ export default function Header({
                             </svg>
                         </div>
                         <span className="text-xl font-bold text-white hidden sm:block">
-                            BrickVault
+                            BrickOasis
                         </span>
                     </Link>
 

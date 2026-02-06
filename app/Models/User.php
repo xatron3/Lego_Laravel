@@ -21,11 +21,13 @@ class User extends Authenticatable
    */
   protected $fillable = [
     'name',
+    'username',
     'email',
     'password',
     'role',
     'google_id',
     'avatar',
+    'bio',
     'settings',
     'is_pro',
     'pro_expires_at',
@@ -321,6 +323,84 @@ class User extends Authenticatable
   public function flipTransactions(): HasMany
   {
     return $this->hasMany(FlipTransaction::class);
+  }
+
+  /**
+   * Users that this user follows.
+   */
+  public function following(): HasMany
+  {
+    return $this->hasMany(Follow::class, 'follower_id');
+  }
+
+  /**
+   * Users that follow this user.
+   */
+  public function followers(): HasMany
+  {
+    return $this->hasMany(Follow::class, 'following_id');
+  }
+
+  /**
+   * Get users this user follows (User models).
+   */
+  public function followingUsers(): BelongsToMany
+  {
+    return $this->belongsToMany(User::class, 'follows', 'follower_id', 'following_id')
+      ->withTimestamps();
+  }
+
+  /**
+   * Get users who follow this user (User models).
+   */
+  public function followerUsers(): BelongsToMany
+  {
+    return $this->belongsToMany(User::class, 'follows', 'following_id', 'follower_id')
+      ->withTimestamps();
+  }
+
+  /**
+   * Check if this user follows a given user.
+   */
+  public function isFollowing(User $user): bool
+  {
+    return $this->following()->where('following_id', $user->id)->exists();
+  }
+
+  /**
+   * Check if a given user follows this user.
+   */
+  public function isFollowedBy(User $user): bool
+  {
+    return $this->followers()->where('follower_id', $user->id)->exists();
+  }
+
+  /**
+   * Follow a user.
+   */
+  public function follow(User $user): void
+  {
+    if ($user->id === $this->id) {
+      return;
+    }
+
+    $this->following()->firstOrCreate(['following_id' => $user->id]);
+  }
+
+  /**
+   * Unfollow a user.
+   */
+  public function unfollow(User $user): void
+  {
+    $this->following()->where('following_id', $user->id)->delete();
+  }
+
+  /**
+   * Get the user's posts.
+   */
+  public function posts(): HasMany
+  {
+    return $this->hasMany(Post::class);
   }
 
   /**

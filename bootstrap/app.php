@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
       require __DIR__ . '/../routes/catalog.php';
       require __DIR__ . '/../routes/ldraw.php';
       require __DIR__ . '/../routes/flipping.php';
+      require __DIR__ . '/../routes/community.php';
     },
   )
   ->withMiddleware(function (Middleware $middleware): void {

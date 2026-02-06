@@ -78,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('mocs/{id}/images', [MocController::class, 'uploadImages']);
   Route::delete('mocs/{id}/images/{imageId}', [MocController::class, 'deleteImage']);
   Route::patch('mocs/{id}/images/{imageId}/primary', [MocController::class, 'setPrimaryImage']);
+
+  // MOC instructions PDF download
+  Route::get('mocs/{id}/download-instructions', [MocController::class, 'downloadInstructions']);
   Route::patch('mocs/{id}/images/reorder', [MocController::class, 'reorderImages']);
 
   // Backward compatibility aliases for lego-models routes

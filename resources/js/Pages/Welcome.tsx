@@ -75,7 +75,7 @@ export default function Welcome({
         <>
             <Head>
                 <title>
-                    BrickVault - 3D LEGO LDraw Viewer, Building Instructions &
+                    BrickOasis - 3D LEGO LDraw Viewer, Building Instructions &
                     MOC Marketplace
                 </title>
                 <meta
@@ -88,7 +88,7 @@ export default function Welcome({
                 />
                 <meta
                     property="og:title"
-                    content="BrickVault - 3D LEGO LDraw Viewer & MOC Marketplace"
+                    content="BrickOasis - 3D LEGO LDraw Viewer & MOC Marketplace"
                 />
                 <meta
                     property="og:description"
@@ -946,7 +946,7 @@ export default function Welcome({
                         </h2>
                         <p className="text-gray-300 text-xl mb-4">
                             Join {stats.total_users.toLocaleString()} builders
-                            who are already using BrickVault
+                            who are already using BrickOasis
                         </p>
                         <p className="text-gray-400 mb-10 max-w-2xl mx-auto">
                             Get instant access to{" "}

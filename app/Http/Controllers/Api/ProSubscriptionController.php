@@ -65,7 +65,7 @@ class ProSubscriptionController extends Controller
           'price_data' => [
             'currency' => config('stripe.currency', 'usd'),
             'product_data' => [
-              'name' => 'BrickVault Pro',
+              'name' => 'BrickOasis Pro',
               'description' => 'Monthly Pro subscription - Unlimited flips, 3D viewer access, and MOC promotion',
             ],
             'unit_amount' => self::PRICE_CENTS,

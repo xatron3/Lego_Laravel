@@ -233,7 +233,7 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
                                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                             </svg>
                             <span className="text-yellow-500 font-medium text-sm">
-                                BrickVault Pro
+                                BrickOasis Pro
                             </span>
                         </div>
 
@@ -245,7 +245,7 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
                         </h1>
 
                         <p className="text-xl text-gray-300 mb-10 leading-relaxed">
-                            Unlock the full potential of BrickVault with Pro.
+                            Unlock the full potential of BrickOasis with Pro.
                             Get unlimited flip tracking, full 3D instruction
                             viewer access, and promote your MOCs to the
                             community.
@@ -304,7 +304,7 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
                         What you get with Pro
                     </h2>
                     <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
-                        Pro unlocks the full BrickVault experience. Here's how
+                        Pro unlocks the full BrickOasis experience. Here's how
                         it compares to the free tier.
                     </p>
 
@@ -878,7 +878,7 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
                         </h2>
                         <p className="text-gray-400 mb-8">
                             Join the Pro community and get the most out of
-                            BrickVault. Just {price}/month, cancel anytime.
+                            BrickOasis. Just {price}/month, cancel anytime.
                         </p>
                         <button
                             onClick={handleSubscribe}

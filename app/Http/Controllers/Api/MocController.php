@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Moc;
 use App\Models\MocImage;
 use App\Models\OrderItem;
+use App\Models\Post;
+use App\Models\PostImage;
 use App\Models\Set;
 use App\Models\Theme;
 use App\Models\Inventory;
 use App\Models\InventoryPart;
 use App\Models\Part;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -188,11 +191,19 @@ class MocController extends Controller
       'description' => 'nullable|string',
       'ldr_content' => 'required|string',
       'file_name' => 'nullable|string|max:255',
+      'instructions_pdf' => 'required|file|mimes:pdf|max:51200',
       'total_steps' => 'integer|min:0',
       'is_public' => 'boolean',
       'price' => 'nullable|numeric|min:0',
       'thumbnail' => 'nullable|string',
+      'share_to_feed' => 'nullable|boolean',
     ]);
+
+    // Store PDF file
+    $pdfPath = null;
+    if ($request->hasFile('instructions_pdf')) {
+      $pdfPath = $request->file('instructions_pdf')->store('moc-instructions', 'public');
+    }
 
     // Get or create MOC theme
     $mocTheme = $this->getOrCreateMocTheme();
@@ -217,6 +228,7 @@ class MocController extends Controller
         'description' => $validated['description'] ?? null,
         'ldr_content' => $validated['ldr_content'],
         'file_name' => $validated['file_name'] ?? null,
+        'instructions_pdf' => $pdfPath,
         'total_steps' => $validated['total_steps'] ?? 0,
         'total_parts' => 0,
         'price' => $validated['price'] ?? null,
@@ -233,12 +245,49 @@ class MocController extends Controller
       $set->update(['num_parts' => $totalParts]);
       $moc->update(['total_parts' => $totalParts]);
 
+      // 5. Share to community feed if requested
+      if ($validated['share_to_feed'] ?? false) {
+        $this->shareMocToFeed($moc, $request->user());
+      }
+
       DB::commit();
 
       return response()->json($moc->load('user:id,name,is_pro', 'set.theme', 'images'), 201);
     } catch (\Exception $e) {
       DB::rollBack();
       return response()->json(['message' => 'Failed to create MOC: ' . $e->getMessage()], 500);
+    }
+  }
+
+  /**
+   * Share a MOC to the community feed.
+   */
+  private function shareMocToFeed(Moc $moc, User $user): void
+  {
+    $post = Post::create([
+      'user_id' => $user->id,
+      'type' => 'moc',
+      'title' => $moc->name,
+      'body' => $moc->description,
+      'visibility' => 'public',
+      'metadata' => [
+        'moc_id' => $moc->id,
+        'set_num' => $moc->set_num,
+        'price' => $moc->price,
+        'total_parts' => $moc->total_parts,
+        'total_steps' => $moc->total_steps,
+      ],
+    ]);
+
+    // Link MOC images to the post
+    $mocImages = $moc->images()->get();
+    foreach ($mocImages as $index => $mocImage) {
+      PostImage::create([
+        'post_id' => $post->id,
+        'path' => $mocImage->path,
+        'filename' => $mocImage->filename ?? 'image.jpg',
+        'sort_order' => $index,
+      ]);
     }
   }
 
@@ -304,11 +353,21 @@ class MocController extends Controller
       'description' => 'nullable|string',
       'ldr_content' => 'sometimes|required|string',
       'file_name' => 'nullable|string|max:255',
+      'instructions_pdf' => 'sometimes|file|mimes:pdf|max:51200',
       'total_steps' => 'integer|min:0',
       'is_public' => 'boolean',
       'price' => 'nullable|numeric|min:0',
       'thumbnail' => 'nullable|string',
     ]);
+
+    // Handle PDF update
+    if ($request->hasFile('instructions_pdf')) {
+      // Delete old PDF if exists
+      if ($moc->instructions_pdf) {
+        Storage::disk('public')->delete($moc->instructions_pdf);
+      }
+      $validated['instructions_pdf'] = $request->file('instructions_pdf')->store('moc-instructions', 'public');
+    }
 
     DB::beginTransaction();
     try {
@@ -726,5 +785,46 @@ class MocController extends Controller
     usort($parts, fn($a, $b) => $b['quantity'] - $a['quantity']);
 
     return $parts;
+  }
+
+  /**
+   * Download MOC instructions PDF.
+   */
+  public function downloadInstructions(Request $request, string $id)
+  {
+    $moc = Moc::findOrFail($id);
+    $user = $request->user();
+
+    // Check if instructions exist
+    if (!$moc->instructions_pdf) {
+      return response()->json(['message' => 'No instructions available for this MOC.'], 404);
+    }
+
+    // Check access permissions
+    // Free MOCs: anyone can download
+    // Paid MOCs: must be creator or have purchased
+    if (!$moc->isFree()) {
+      if (!$user) {
+        return response()->json(['message' => 'Authentication required.'], 401);
+      }
+
+      if ($moc->user_id !== $user->id && !$user->ownsMoc($moc)) {
+        return response()->json(['message' => 'You must purchase this MOC to download instructions.'], 403);
+      }
+    }
+
+    // Get file path
+    $filePath = storage_path('app/public/' . $moc->instructions_pdf);
+
+    if (!file_exists($filePath)) {
+      return response()->json(['message' => 'Instructions file not found.'], 404);
+    }
+
+    // Generate download filename
+    $downloadName = str_replace(' ', '_', $moc->name) . '_Instructions.pdf';
+
+    return response()->download($filePath, $downloadName, [
+      'Content-Type' => 'application/pdf',
+    ]);
   }
 }

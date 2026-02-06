@@ -26,6 +26,7 @@ class Moc extends Model
     'description',
     'ldr_content',
     'file_name',
+    'instructions_pdf',
     'total_steps',
     'total_parts',
     'user_id',

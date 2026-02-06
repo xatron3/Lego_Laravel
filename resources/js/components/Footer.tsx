@@ -7,7 +7,7 @@ export default function Footer() {
                 <div className="grid md:grid-cols-4 gap-8 mb-8">
                     <div className="col-span-2">
                         <h3 className="text-xl font-bold text-transparent bg-clip-text bg-linear-to-r from-yellow-400 to-orange-500 mb-3">
-                            BrickVault
+                            BrickOasis
                         </h3>
                         <p className="text-gray-400 mb-4">
                             The ultimate platform for LEGO enthusiasts. Explore,
@@ -63,24 +63,42 @@ export default function Footer() {
                         </ul>
                     </div>
                     <div>
-                        <h4 className="text-white font-semibold mb-3">
-                            Technology
-                        </h4>
-                        <ul className="space-y-2 text-gray-400 text-sm">
-                            <li>Three.js 3D Engine</li>
-                            <li>LDraw File Format</li>
-                            <li>React & Laravel</li>
-                            <li>Rebrickable Data</li>
+                        <h4 className="text-white font-semibold mb-3">Legal</h4>
+                        <ul className="space-y-2">
+                            <li>
+                                <Link
+                                    href="/about"
+                                    className="text-gray-400 hover:text-yellow-400 transition-colors"
+                                >
+                                    About
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    href="/privacy"
+                                    className="text-gray-400 hover:text-yellow-400 transition-colors"
+                                >
+                                    Privacy Policy
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    href="/terms"
+                                    className="text-gray-400 hover:text-yellow-400 transition-colors"
+                                >
+                                    Terms of Service
+                                </Link>
+                            </li>
                         </ul>
                     </div>
                 </div>
                 <div className="border-t border-gray-800 pt-8 text-center text-gray-500">
                     <p className="mb-2">
-                        © 2026 BrickVault. Built with passion for LEGO
+                        © 2026 BrickOasis. Built with passion for LEGO
                         enthusiasts worldwide.
                     </p>
                     <p className="text-sm">
-                        LEGO® is a trademark of the LEGO Group. BrickVault is
+                        LEGO® is a trademark of the LEGO Group. BrickOasis is
                         not affiliated with the LEGO Group.
                     </p>
                 </div>

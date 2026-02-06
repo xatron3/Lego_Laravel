@@ -5,7 +5,7 @@ import { useModelLoader } from "../../hooks/useModelLoader";
 // Step indicator constants
 const STEPS = [
     { id: 1, name: "General Info", description: "Name and description" },
-    { id: 2, name: "Build File", description: "Upload LDraw file" },
+    { id: 2, name: "Files", description: "Upload LDraw and PDF" },
     { id: 3, name: "Images", description: "Add photos" },
     { id: 4, name: "Review", description: "Confirm and submit" },
 ];
@@ -37,9 +37,14 @@ export default function MocSubmitWizard({
 
     // Step 2: Build File
     const [fileName, setFileName] = useState("");
+    const [pdfFile, setPdfFile] = useState<File | null>(null);
+    const [pdfFileName, setPdfFileName] = useState("");
 
     // Step 3: Images
     const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
+
+    // Step 4: Share to feed
+    const [shareToFeed, setShareToFeed] = useState(false);
 
     // Submission state
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +61,8 @@ export default function MocSubmitWizard({
 
     // Step validation
     const isStep1Valid = name.trim().length > 0;
-    const isStep2Valid = modelText !== null && modelText.length > 0;
+    const isStep2Valid =
+        modelText !== null && modelText.length > 0 && pdfFile !== null;
     const isStep3Valid = true; // Images are optional
 
     const canProceed = () => {
@@ -79,6 +85,14 @@ export default function MocSubmitWizard({
         if (!file) return;
         setFileName(file.name);
         await loadFile(file);
+        setError(null);
+    };
+
+    const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setPdfFile(file);
+        setPdfFileName(file.name);
         setError(null);
     };
 
@@ -121,7 +135,7 @@ export default function MocSubmitWizard({
     };
 
     const handleSubmit = async () => {
-        if (!modelText || !name.trim()) return;
+        if (!modelText || !name.trim() || !pdfFile) return;
 
         setIsSubmitting(true);
         setError(null);
@@ -133,10 +147,12 @@ export default function MocSubmitWizard({
                 description: description.trim() || undefined,
                 ldr_content: modelText,
                 file_name: fileName,
+                instructions_pdf: pdfFile,
                 total_steps: totalSteps,
                 total_parts: totalParts,
                 is_public: isPublic,
                 price: price ? parseFloat(price) : null,
+                share_to_feed: shareToFeed,
             });
 
             // 2. Upload images if any
@@ -168,7 +184,10 @@ export default function MocSubmitWizard({
         setDescription("");
         setIsPublic(false);
         setPrice("");
+        setShareToFeed(false);
         setFileName("");
+        setPdfFile(null);
+        setPdfFileName("");
         imagePreviews.forEach((p) => URL.revokeObjectURL(p.preview));
         setImagePreviews([]);
         setSuccess(false);
@@ -389,19 +408,20 @@ export default function MocSubmitWizard({
                     </div>
                 )}
 
-                {/* Step 2: Build File */}
+                {/* Step 2: Files */}
                 {currentStep === 2 && (
                     <div className="space-y-6">
                         <div>
                             <h2 className="text-xl font-bold text-white mb-4">
-                                Build File
+                                Files
                             </h2>
                             <p className="text-gray-400 text-sm mb-6">
-                                Upload your LDraw file (.ldr or .mpd) containing
-                                the building instructions.
+                                Upload your LDraw file (.ldr or .mpd) and PDF
+                                build instructions.
                             </p>
                         </div>
 
+                        {/* LDraw File Upload */}
                         <div>
                             <label className="block text-white font-medium mb-2">
                                 LDraw File{" "}
@@ -465,6 +485,73 @@ export default function MocSubmitWizard({
                                             </p>
                                             <p className="text-gray-500 text-sm mt-1">
                                                 .ldr or .mpd files only
+                                            </p>
+                                        </div>
+                                    )}
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* PDF Instructions Upload */}
+                        <div>
+                            <label className="block text-white font-medium mb-2">
+                                Build Instructions (PDF){" "}
+                                <span className="text-red-400">*</span>
+                            </label>
+                            <div className="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-yellow-500 transition-colors">
+                                <input
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    onChange={handlePdfUpload}
+                                    className="hidden"
+                                    id="pdf-file-upload"
+                                />
+                                <label
+                                    htmlFor="pdf-file-upload"
+                                    className="cursor-pointer"
+                                >
+                                    {pdfFileName ? (
+                                        <div>
+                                            <svg
+                                                className="w-12 h-12 text-green-400 mx-auto mb-2"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M5 13l4 4L19 7"
+                                                />
+                                            </svg>
+                                            <p className="text-white font-medium">
+                                                {pdfFileName}
+                                            </p>
+                                            <p className="text-yellow-400 text-sm mt-2">
+                                                Click to replace file
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <svg
+                                                className="w-12 h-12 text-gray-400 mx-auto mb-2"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                                />
+                                            </svg>
+                                            <p className="text-gray-400">
+                                                Click to upload or drag and drop
+                                            </p>
+                                            <p className="text-gray-500 text-sm mt-1">
+                                                PDF files only (max 50MB)
                                             </p>
                                         </div>
                                     )}
@@ -849,6 +936,34 @@ export default function MocSubmitWizard({
                                     </p>
                                 )}
                             </div>
+
+                            {/* Share to Community */}
+                            <div className="bg-gray-700/50 rounded-lg p-4">
+                                <h3 className="text-white font-medium mb-3">
+                                    Community Sharing
+                                </h3>
+                                <label className="flex items-start gap-3 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={shareToFeed}
+                                        onChange={(e) =>
+                                            setShareToFeed(e.target.checked)
+                                        }
+                                        className="mt-1 w-4 h-4 rounded border-gray-600 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-gray-800"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="text-white group-hover:text-yellow-400 transition-colors">
+                                            Share this MOC to the community feed
+                                        </div>
+                                        <p className="text-sm text-gray-400 mt-1">
+                                            Auto-generates a post with your
+                                            MOC's images and details. Users can
+                                            view the post and visit your store
+                                            page.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -879,7 +994,7 @@ export default function MocSubmitWizard({
                     <button
                         onClick={handleSubmit}
                         disabled={isSubmitting || !canProceed()}
-                        className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-8 py-3 bg-linear-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? (
                             <span className="flex items-center gap-2">

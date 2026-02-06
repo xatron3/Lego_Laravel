@@ -4,9 +4,11 @@ import { router } from "@inertiajs/react";
 export interface User {
     id: number;
     name: string;
+    username: string | null;
     email: string;
     role: "normal" | "submitter" | "mod" | "admin";
     avatar: string | null;
+    bio: string | null;
     is_pro?: boolean;
     pro_expires_at?: string | null;
     created_at?: string;

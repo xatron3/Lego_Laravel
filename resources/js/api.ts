@@ -44,6 +44,7 @@ export interface LegoModelData {
     description?: string;
     ldr_content: string;
     file_name?: string;
+    instructions_pdf?: string | File;
     total_steps: number;
     total_parts: number;
     user_id?: number;
@@ -181,16 +182,29 @@ export const api = {
         data: Omit<LegoModelData, "id" | "created_at" | "user">,
     ): Promise<LegoModelData> {
         await ensureCsrfCookie();
-        const response = await fetch(`${API_BASE}/lego-models`, {
+
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                if (value instanceof File) {
+                    formData.append(key, value);
+                } else if (typeof value === "boolean") {
+                    formData.append(key, value ? "1" : "0");
+                } else {
+                    formData.append(key, String(value));
+                }
+            }
+        });
+
+        const response = await fetch(`${API_BASE}/mocs`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
                 Accept: "application/json",
                 "X-CSRF-TOKEN": getCsrfToken(),
                 "X-XSRF-TOKEN": getCsrfToken(),
             },
             credentials: "same-origin",
-            body: JSON.stringify(data),
+            body: formData,
         });
         if (!response.ok) throw new Error("Failed to save model");
         return response.json();
@@ -201,16 +215,30 @@ export const api = {
         data: Partial<Omit<LegoModelData, "id" | "created_at" | "user">>,
     ): Promise<LegoModelData> {
         await ensureCsrfCookie();
-        const response = await fetch(`${API_BASE}/lego-models/${id}`, {
-            method: "PATCH",
+
+        const formData = new FormData();
+        formData.append("_method", "PATCH");
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                if (value instanceof File) {
+                    formData.append(key, value);
+                } else if (typeof value === "boolean") {
+                    formData.append(key, value ? "1" : "0");
+                } else {
+                    formData.append(key, String(value));
+                }
+            }
+        });
+
+        const response = await fetch(`${API_BASE}/mocs/${id}`, {
+            method: "POST",
             headers: {
-                "Content-Type": "application/json",
                 Accept: "application/json",
                 "X-CSRF-TOKEN": getCsrfToken(),
                 "X-XSRF-TOKEN": getCsrfToken(),
             },
             credentials: "same-origin",
-            body: JSON.stringify(data),
+            body: formData,
         });
         if (!response.ok) throw new Error("Failed to update model");
         return response.json();
@@ -344,6 +372,11 @@ export const api = {
             throw new Error(error.message || "Failed to unclaim model");
         }
         return response.json();
+    },
+
+    // Download MOC instructions PDF
+    downloadInstructions(id: number): void {
+        window.location.href = `${API_BASE}/mocs/${id}/download-instructions`;
     },
 
     // Upload thumbnail for a model
@@ -1834,3 +1867,368 @@ export interface CatalogCategoryPart {
     photo_url?: string;
     bricklink_url: string;
 }
+
+// ========================================
+// Social / Community Types
+// ========================================
+
+export interface PostImageData {
+    id: number;
+    post_id: number;
+    path: string;
+    filename: string | null;
+    sort_order: number;
+    url: string;
+}
+
+export interface PostUser {
+    id: number;
+    name: string;
+    username: string | null;
+    avatar: string | null;
+}
+
+export interface CommentData {
+    id: number;
+    user_id: number;
+    body: string;
+    parent_id: number | null;
+    created_at: string;
+    updated_at: string;
+    user: PostUser;
+    likes_count: number;
+    is_liked: boolean;
+    replies?: CommentData[];
+}
+
+export interface MocMetadata {
+    moc_id: number;
+    set_num: string;
+    price: number;
+    total_parts: number;
+    total_steps: number;
+}
+
+export interface PostData {
+    id: number;
+    user_id: number;
+    type: string;
+    title: string | null;
+    body: string | null;
+    metadata: MocMetadata | Record<string, any> | null;
+    created_at: string;
+    updated_at: string;
+    user: PostUser;
+    images: PostImageData[];
+    likes_count: number;
+    comments_count: number;
+    is_liked: boolean;
+    is_following?: boolean;
+    is_from_feed?: boolean;
+    top_level_comments?: CommentData[];
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    next_page_url: string | null;
+    prev_page_url: string | null;
+}
+
+export interface ProfileUser {
+    id: number;
+    name: string;
+    username: string;
+    avatar: string | null;
+    bio: string | null;
+    created_at: string;
+}
+
+export interface ProfileStats {
+    followers_count: number;
+    following_count: number;
+    posts_count: number;
+    mocs_count: number;
+}
+
+export interface FollowUser {
+    id: number;
+    name: string;
+    username: string | null;
+    avatar: string | null;
+    is_following: boolean;
+    is_self: boolean;
+}
+
+// ========================================
+// Social / Community API Methods
+// ========================================
+
+export const socialApi = {
+    // Posts
+    async createPost(formData: FormData): Promise<PostData> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/posts`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: formData,
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to create post");
+        }
+        return response.json();
+    },
+
+    async deletePost(id: number): Promise<void> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/posts/${id}`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to delete post");
+    },
+
+    async getPost(id: number): Promise<PostData> {
+        const response = await fetch(`${API_BASE}/posts/${id}`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch post");
+        return response.json();
+    },
+
+    async getFeed(page = 1): Promise<PaginatedResponse<PostData>> {
+        const response = await fetch(`${API_BASE}/feed?page=${page}`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch feed");
+        return response.json();
+    },
+
+    async getUserPosts(
+        userId: number,
+        page = 1,
+    ): Promise<PaginatedResponse<PostData>> {
+        const response = await fetch(
+            `${API_BASE}/users/${userId}/posts?page=${page}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to fetch user posts");
+        return response.json();
+    },
+
+    // Likes
+    async likePost(
+        id: number,
+    ): Promise<{ likes_count: number; is_liked: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/posts/${id}/like`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to like post");
+        return response.json();
+    },
+
+    async unlikePost(
+        id: number,
+    ): Promise<{ likes_count: number; is_liked: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/posts/${id}/like`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to unlike post");
+        return response.json();
+    },
+
+    // Comments
+    async addComment(
+        postId: number,
+        body: string,
+        parentId?: number,
+    ): Promise<CommentData> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/posts/${postId}/comments`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ body, parent_id: parentId }),
+        });
+        if (!response.ok) throw new Error("Failed to add comment");
+        return response.json();
+    },
+
+    async deleteComment(postId: number, commentId: number): Promise<void> {
+        await ensureCsrfCookie();
+        const response = await fetch(
+            `${API_BASE}/posts/${postId}/comments/${commentId}`,
+            {
+                method: "DELETE",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to delete comment");
+    },
+
+    async likeComment(
+        id: number,
+    ): Promise<{ likes_count: number; is_liked: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/comments/${id}/like`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to like comment");
+        return response.json();
+    },
+
+    async unlikeComment(
+        id: number,
+    ): Promise<{ likes_count: number; is_liked: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/comments/${id}/like`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to unlike comment");
+        return response.json();
+    },
+
+    // Follow
+    async followUser(
+        id: number,
+    ): Promise<{ followers_count: number; is_following: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/users/${id}/follow`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to follow user");
+        return response.json();
+    },
+
+    async unfollowUser(
+        id: number,
+    ): Promise<{ followers_count: number; is_following: boolean }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/users/${id}/follow`, {
+            method: "DELETE",
+            headers: {
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to unfollow user");
+        return response.json();
+    },
+
+    // Profile
+    async updateProfile(data: {
+        username?: string;
+        bio?: string;
+    }): Promise<{ user: ProfileUser }> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/user/profile`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to update profile");
+        }
+        return response.json();
+    },
+
+    async getFollowers(
+        userId: number,
+        page = 1,
+    ): Promise<PaginatedResponse<FollowUser>> {
+        const response = await fetch(
+            `${API_BASE}/users/${userId}/followers?page=${page}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to fetch followers");
+        return response.json();
+    },
+
+    async getFollowing(
+        userId: number,
+        page = 1,
+    ): Promise<PaginatedResponse<FollowUser>> {
+        const response = await fetch(
+            `${API_BASE}/users/${userId}/following?page=${page}`,
+            {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) throw new Error("Failed to fetch following");
+        return response.json();
+    },
+};

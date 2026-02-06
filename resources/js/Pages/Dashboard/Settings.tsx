@@ -2,12 +2,16 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import DashboardLayout from "../../components/DashboardLayout";
 import ProBadge from "../../components/ProBadge";
-import { api } from "../../api";
+import { api, socialApi } from "../../api";
 
 export default function Settings() {
     const { user, isPro } = useAuth();
     const [settingsName, setSettingsName] = useState(user?.name || "");
     const [settingsEmail, setSettingsEmail] = useState(user?.email || "");
+    const [settingsUsername, setSettingsUsername] = useState(
+        user?.username || "",
+    );
+    const [settingsBio, setSettingsBio] = useState(user?.bio || "");
     const [currencySymbol, setCurrencySymbol] = useState(
         user?.settings?.flipping?.currency_symbol || "$",
     );
@@ -15,6 +19,9 @@ export default function Settings() {
         "left" | "right"
     >(user?.settings?.flipping?.currency_placement || "left");
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [profileError, setProfileError] = useState<string | null>(null);
+    const [profileSuccess, setProfileSuccess] = useState(false);
     const [isCancellingPro, setIsCancellingPro] = useState(false);
     const [isResumingPro, setIsResumingPro] = useState(false);
 
@@ -22,6 +29,8 @@ export default function Settings() {
         if (user) {
             setSettingsName(user.name);
             setSettingsEmail(user.email);
+            setSettingsUsername(user.username || "");
+            setSettingsBio(user.bio || "");
             setCurrencySymbol(user.settings?.flipping?.currency_symbol || "$");
             setCurrencyPlacement(
                 user.settings?.flipping?.currency_placement || "left",
@@ -51,12 +60,110 @@ export default function Settings() {
         }
     };
 
+    const handleSaveProfile = async () => {
+        setIsSavingProfile(true);
+        setProfileError(null);
+        setProfileSuccess(false);
+        try {
+            await socialApi.updateProfile({
+                username: settingsUsername,
+                bio: settingsBio || undefined,
+            });
+            setProfileSuccess(true);
+            setTimeout(() => setProfileSuccess(false), 3000);
+        } catch (error: any) {
+            setProfileError(error.message || "Failed to save profile");
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
     return (
         <DashboardLayout currentPage="settings">
             <div className="max-w-2xl">
                 <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
                 <div className="space-y-6">
+                    {/* Community Profile Section */}
+                    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h2 className="text-lg font-semibold text-white mb-1">
+                            Community Profile
+                        </h2>
+                        <p className="text-gray-400 text-sm mb-4">
+                            Set up your username and bio to join the community
+                            and share builds.
+                        </p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-2">
+                                    Username
+                                </label>
+                                <div className="flex items-center">
+                                    <span className="text-gray-500 mr-1">
+                                        @
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={settingsUsername}
+                                        onChange={(e) =>
+                                            setSettingsUsername(
+                                                e.target.value.replace(
+                                                    /[^a-zA-Z0-9_-]/g,
+                                                    "",
+                                                ),
+                                            )
+                                        }
+                                        placeholder="your-username"
+                                        maxLength={30}
+                                        className="flex-1 px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                    />
+                                </div>
+                                <p className="text-gray-500 text-xs mt-1">
+                                    Letters, numbers, hyphens, and underscores
+                                    only. 3-30 characters.
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-2">
+                                    Bio
+                                </label>
+                                <textarea
+                                    value={settingsBio}
+                                    onChange={(e) =>
+                                        setSettingsBio(e.target.value)
+                                    }
+                                    placeholder="Tell the community about yourself..."
+                                    maxLength={500}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
+                                />
+                                <p className="text-gray-500 text-xs mt-1 text-right">
+                                    {settingsBio.length}/500
+                                </p>
+                            </div>
+                            {profileError && (
+                                <p className="text-red-400 text-sm">
+                                    {profileError}
+                                </p>
+                            )}
+                            {profileSuccess && (
+                                <p className="text-green-400 text-sm">
+                                    Profile saved!
+                                </p>
+                            )}
+                            <button
+                                onClick={handleSaveProfile}
+                                disabled={
+                                    isSavingProfile ||
+                                    settingsUsername.length < 3
+                                }
+                                className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {isSavingProfile ? "Saving..." : "Save Profile"}
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Profile Section */}
                     <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
                         <h2 className="text-lg font-semibold text-white mb-4">

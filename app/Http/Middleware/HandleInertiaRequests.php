@@ -41,9 +41,11 @@ class HandleInertiaRequests extends Middleware
         'user' => $request->user() ? [
           'id' => $request->user()->id,
           'name' => $request->user()->name,
+          'username' => $request->user()->username,
           'email' => $request->user()->email,
           'role' => $request->user()->role,
           'avatar' => $request->user()->avatar,
+          'bio' => $request->user()->bio,
           'is_pro' => $request->user()->isPro(),
           'pro_expires_at' => $request->user()->pro_expires_at?->toISOString(),
           'created_at' => $request->user()->created_at?->toISOString(),
