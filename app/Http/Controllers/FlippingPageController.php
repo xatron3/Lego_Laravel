@@ -85,6 +85,11 @@ class FlippingPageController extends Controller
       'filters' => $request->only(['type', 'status', 'search', 'platform', 'sort', 'direction']),
       'topSets' => $topSets,
       'platformAnalytics' => $platformStats,
+      'flipLimits' => [
+        'is_pro' => $user->isPro(),
+        'remaining' => $user->remainingFlipTransactions(),
+        'limit' => $user->isPro() ? null : (int) \App\Models\SiteSetting::getValue('free_flip_transaction_limit', 100),
+      ],
     ]);
   }
 

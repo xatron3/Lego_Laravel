@@ -7,6 +7,8 @@ export interface User {
     email: string;
     role: "normal" | "submitter" | "mod" | "admin";
     avatar: string | null;
+    is_pro?: boolean;
+    pro_expires_at?: string | null;
     created_at?: string;
     settings?: {
         flipping?: {
@@ -21,6 +23,7 @@ interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     isAuthenticated: boolean;
+    isPro: boolean;
     login: (
         email: string,
         password: string,
@@ -203,6 +206,7 @@ export function AuthProvider({
         user,
         isLoading,
         isAuthenticated: !!user,
+        isPro: !!user?.is_pro,
         login,
         register,
         logout,

@@ -70,6 +70,9 @@ Route::get('/viewer/{slug}', function ($slug) {
   return Inertia::render('Viewer', ['modelId' => $id]);
 })->where('slug', '[a-z0-9\-]+')->name('viewer.model');
 
+// Pro subscription promo page
+Route::get('/pro', [App\Http\Controllers\PageController::class, 'pro'])->name('pro');
+
 /*
 |--------------------------------------------------------------------------
 | User Dashboard Routes
@@ -137,6 +140,10 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
   Route::get('/data-import', function () {
     return Inertia::render('AdminDataImport');
   })->name('admin.data-import');
+
+  Route::get('/site-settings', function () {
+    return Inertia::render('AdminSiteSettings');
+  })->name('admin.site-settings');
 });
 
 /*

@@ -7,6 +7,8 @@ import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import ProBadge from "../components/ProBadge";
+import ProUpgradePrompt from "../components/ProUpgradePrompt";
 import Scene from "../Scene";
 import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
 import { api, LegoModelData, InventoryPartData } from "../api";
@@ -16,7 +18,7 @@ interface ModelDetailProps {
 }
 
 export default function ModelDetail({ id }: ModelDetailProps) {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, isPro } = useAuth();
     const { isInCart, addToCart, removeFromCart } = useCart();
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [model, setModel] = useState<LegoModelData | null>(null);
@@ -451,9 +453,12 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                             </span>
                                         </div>
                                         <div>
-                                            <div className="text-white font-medium">
+                                            <div className="text-white font-medium flex items-center gap-2">
                                                 {model.user?.name ||
                                                     "Anonymous"}
+                                                {model.user?.is_pro && (
+                                                    <ProBadge size="sm" />
+                                                )}
                                             </div>
                                             <div className="text-gray-400 text-sm">
                                                 Creator
@@ -593,12 +598,20 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                             </button>
                                         )}
 
-                                        <button
-                                            onClick={handleViewInViewer}
-                                            className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors border border-gray-600"
-                                        >
-                                            Preview in Viewer
-                                        </button>
+                                        {model.can_access_viewer === false ? (
+                                            <ProUpgradePrompt
+                                                feature="3D Instruction Viewer"
+                                                description="Upgrade to Pro to view step-by-step 3D building instructions for free community MOCs."
+                                                compact
+                                            />
+                                        ) : (
+                                            <button
+                                                onClick={handleViewInViewer}
+                                                className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors border border-gray-600"
+                                            >
+                                                Preview in Viewer
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

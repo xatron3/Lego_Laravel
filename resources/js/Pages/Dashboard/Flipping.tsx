@@ -6,6 +6,7 @@ import FlipTransactionForm from "../../components/flipping/FlipTransactionForm";
 import FlipFilters from "../../components/flipping/FlipFilters";
 import FlipReports from "../../components/flipping/FlipReports";
 import DashboardLayout from "../../components/DashboardLayout";
+import ProUpgradePrompt from "../../components/ProUpgradePrompt";
 import type { FlipStatsData, FlipTransactionData } from "../Flipping";
 
 type TabType = "overview" | "reports";
@@ -37,6 +38,12 @@ interface PlatformStat {
     profit: number;
 }
 
+interface FlipLimits {
+    is_pro: boolean;
+    remaining: number | null;
+    limit: number | null;
+}
+
 interface DashboardFlippingProps {
     stats: FlipStatsData;
     transactions: PaginatedData<FlipTransactionData>;
@@ -44,6 +51,7 @@ interface DashboardFlippingProps {
     filters: Record<string, string | undefined>;
     topSets?: SetPerformance[];
     platformAnalytics?: PlatformStat[];
+    flipLimits?: FlipLimits;
 }
 
 export default function DashboardFlipping({
@@ -53,6 +61,7 @@ export default function DashboardFlipping({
     filters,
     topSets = [],
     platformAnalytics = [],
+    flipLimits,
 }: DashboardFlippingProps) {
     const [activeTab, setActiveTab] = useState<TabType>("overview");
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -83,6 +92,12 @@ export default function DashboardFlipping({
         setShowCreateForm(true);
     };
 
+    const limitReached =
+        flipLimits &&
+        !flipLimits.is_pro &&
+        flipLimits.remaining !== null &&
+        flipLimits.remaining <= 0;
+
     return (
         <DashboardLayout currentPage="flipping">
             <div>
@@ -99,7 +114,8 @@ export default function DashboardFlipping({
                     <div className="flex gap-3">
                         <button
                             onClick={() => handleNewTransaction("buy")}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors"
+                            disabled={!!limitReached}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg
                                 className="w-5 h-5"
@@ -118,7 +134,8 @@ export default function DashboardFlipping({
                         </button>
                         <button
                             onClick={() => handleNewTransaction("sell")}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
+                            disabled={!!limitReached}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg
                                 className="w-5 h-5"
@@ -137,6 +154,51 @@ export default function DashboardFlipping({
                         </button>
                     </div>
                 </div>
+
+                {/* Flip Transaction Limit Warning */}
+                {flipLimits &&
+                    !flipLimits.is_pro &&
+                    flipLimits.remaining !== null && (
+                        <div className="mb-6">
+                            {flipLimits.remaining <= 0 ? (
+                                <ProUpgradePrompt
+                                    feature="Flip Transaction Limit Reached"
+                                    description={`You've used all ${flipLimits.limit} free flip transactions. Upgrade to Pro for unlimited tracking.`}
+                                    compact
+                                />
+                            ) : flipLimits.remaining <= 20 ? (
+                                <div className="flex items-center gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                    <svg
+                                        className="w-5 h-5 text-yellow-400 shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                                        />
+                                    </svg>
+                                    <p className="text-yellow-300 text-sm">
+                                        <span className="font-semibold">
+                                            {flipLimits.remaining}
+                                        </span>{" "}
+                                        of {flipLimits.limit} free flip
+                                        transactions remaining.{" "}
+                                        <a
+                                            href="/pro"
+                                            className="text-yellow-400 hover:text-yellow-300 underline font-medium"
+                                        >
+                                            Upgrade to Pro
+                                        </a>{" "}
+                                        for unlimited tracking.
+                                    </p>
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-8 border-b border-gray-700">

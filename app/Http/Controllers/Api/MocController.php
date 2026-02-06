@@ -23,7 +23,7 @@ class MocController extends Controller
    */
   public function index(Request $request): JsonResponse
   {
-    $query = Moc::with(['user:id,name', 'set.theme', 'images'])
+    $query = Moc::with(['user:id,name,is_pro', 'set.theme', 'images'])
       ->visibleTo($request->user());
 
     // Filter by price type
@@ -44,8 +44,9 @@ class MocController extends Controller
       });
     }
 
-    // Sorting
+    // Sorting with Pro promotion (Pro users' MOCs appear first)
     $sort = $request->input('sort', 'newest');
+    $query->proPromoted(); // Pro MOCs always promoted to top
     switch ($sort) {
       case 'oldest':
         $query->oldest();
@@ -83,7 +84,7 @@ class MocController extends Controller
    */
   public function myMocs(Request $request): JsonResponse
   {
-    $mocs = Moc::with(['user:id,name', 'set.theme', 'images'])
+    $mocs = Moc::with(['user:id,name,is_pro', 'set.theme', 'images'])
       ->where('user_id', $request->user()->id)
       ->latest()
       ->get();
@@ -234,7 +235,7 @@ class MocController extends Controller
 
       DB::commit();
 
-      return response()->json($moc->load('user:id,name', 'set.theme', 'images'), 201);
+      return response()->json($moc->load('user:id,name,is_pro', 'set.theme', 'images'), 201);
     } catch (\Exception $e) {
       DB::rollBack();
       return response()->json(['message' => 'Failed to create MOC: ' . $e->getMessage()], 500);
@@ -246,7 +247,7 @@ class MocController extends Controller
    */
   public function show(Request $request, string $id): JsonResponse
   {
-    $moc = Moc::with(['user:id,name', 'set.theme', 'images', 'inventories.parts.part.category', 'inventories.parts.color'])
+    $moc = Moc::with(['user:id,name,is_pro', 'set.theme', 'images', 'inventories.parts.part.category', 'inventories.parts.color'])
       ->findOrFail($id);
 
     // Check access
@@ -268,6 +269,13 @@ class MocController extends Controller
     } else {
       $moc->makeVisible('ldr_content');
     }
+
+    // Check 3D viewer access for free MOCs
+    $canAccessViewer = false;
+    if ($request->user()) {
+      $canAccessViewer = $request->user()->canAccessViewer($moc);
+    }
+    $moc->can_access_viewer = $canAccessViewer;
 
     // Clean up loaded relations
     unset($moc->inventories);
@@ -321,7 +329,7 @@ class MocController extends Controller
 
       DB::commit();
 
-      return response()->json($moc->load('user:id,name', 'set.theme', 'images'));
+      return response()->json($moc->load('user:id,name,is_pro', 'set.theme', 'images'));
     } catch (\Exception $e) {
       DB::rollBack();
       return response()->json(['message' => 'Failed to update MOC: ' . $e->getMessage()], 500);

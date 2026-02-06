@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Moc;
+use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -166,6 +167,43 @@ class PageController extends Controller
       'initialSort' => $sort,
       'initialFilter' => $filter,
       'initialSearch' => $search,
+    ]);
+  }
+
+  /**
+   * Pro subscription promo page.
+   */
+  public function pro(Request $request): Response
+  {
+    $user = $request->user();
+
+    // Get demo MOC IDs from site settings
+    $demoMocIds = SiteSetting::getValue('pro_demo_moc_ids', []);
+
+    $demoMocs = [];
+    if (!empty($demoMocIds)) {
+      $demoMocs = Moc::with(['user:id,name', 'images'])
+        ->whereIn('id', $demoMocIds)
+        ->where('is_public', true)
+        ->get()
+        ->map(fn($moc) => [
+          'id' => $moc->id,
+          'name' => $moc->name,
+          'thumbnail' => $moc->thumbnail,
+          'total_parts' => $moc->total_parts,
+          'total_steps' => $moc->total_steps,
+          'user' => $moc->user ? ['name' => $moc->user->name] : null,
+        ]);
+    }
+
+    // Get flip limit
+    $flipLimit = SiteSetting::getValue('free_flip_transaction_limit', 100);
+
+    return Inertia::render('Pro', [
+      'isPro' => $user?->isPro() ?? false,
+      'demoMocs' => $demoMocs,
+      'flipLimit' => $flipLimit,
+      'price' => '$3.99',
     ]);
   }
 }

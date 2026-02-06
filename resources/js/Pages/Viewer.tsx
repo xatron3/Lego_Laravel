@@ -11,6 +11,7 @@ import { api, LegoModelData } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import AuthModal from "../components/AuthModal";
 import Header from "../components/Header";
+import ProUpgradePrompt from "../components/ProUpgradePrompt";
 import { getPartsForStep } from "../parser";
 import {
     captureCanvasScreenshot,
@@ -23,7 +24,7 @@ interface ViewerProps {
 }
 
 export default function Home({ modelId }: ViewerProps = {}) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isPro } = useAuth();
     const { steps, modelText, loadFile } = useModelLoader();
     const [currentStep, setCurrentStep] = useState(0);
     const [savedModels, setSavedModels] = useState<LegoModelData[]>([]);
@@ -41,6 +42,7 @@ export default function Home({ modelId }: ViewerProps = {}) {
         total: 0,
     });
     const [isSavingScreenshot, setIsSavingScreenshot] = useState(false);
+    const [viewerBlocked, setViewerBlocked] = useState(false);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -67,7 +69,15 @@ export default function Home({ modelId }: ViewerProps = {}) {
 
     const loadModelById = async (id: number) => {
         try {
+            setViewerBlocked(false);
             const fullModel = await api.getModel(id);
+
+            if (fullModel.can_access_viewer === false) {
+                setViewerBlocked(true);
+                setSelectedModelId(id.toString());
+                return;
+            }
+
             const file = new File(
                 [fullModel.ldr_content],
                 fullModel.file_name || "model.ldr",
@@ -243,7 +253,14 @@ export default function Home({ modelId }: ViewerProps = {}) {
                     ref={canvasContainerRef}
                     className="flex-1 bg-gray-800 relative overflow-hidden"
                 >
-                    {!modelText ? (
+                    {viewerBlocked ? (
+                        <div className="flex items-center justify-center h-full">
+                            <ProUpgradePrompt
+                                feature="3D Instruction Viewer"
+                                description="The 3D step-by-step instruction viewer is available for Pro members on free community MOCs. Upgrade to Pro to view building instructions for all models."
+                            />
+                        </div>
+                    ) : !modelText ? (
                         <div className="flex items-center justify-center h-full text-gray-400">
                             <div className="text-center">
                                 <svg

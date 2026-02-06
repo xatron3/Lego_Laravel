@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import DashboardLayout from "../../components/DashboardLayout";
+import ProBadge from "../../components/ProBadge";
 import { api } from "../../api";
 
 export default function Settings() {
-    const { user } = useAuth();
+    const { user, isPro } = useAuth();
     const [settingsName, setSettingsName] = useState(user?.name || "");
     const [settingsEmail, setSettingsEmail] = useState(user?.email || "");
     const [currencySymbol, setCurrencySymbol] = useState(
@@ -14,6 +15,8 @@ export default function Settings() {
         "left" | "right"
     >(user?.settings?.flipping?.currency_placement || "left");
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isCancellingPro, setIsCancellingPro] = useState(false);
+    const [isResumingPro, setIsResumingPro] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -196,6 +199,135 @@ export default function Settings() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Pro Subscription Section */}
+                    <div
+                        className={`bg-gray-800 rounded-xl p-6 border ${isPro ? "border-yellow-500/30" : "border-gray-700"}`}
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <h2 className="text-lg font-semibold text-white">
+                                Pro Subscription
+                            </h2>
+                            {isPro && <ProBadge size="md" />}
+                        </div>
+
+                        {isPro ? (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                    <svg
+                                        className="w-5 h-5 text-green-400 flex-shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+                                    <div>
+                                        <p className="text-green-400 font-medium">
+                                            Active Pro Subscription
+                                        </p>
+                                        {user?.pro_expires_at && (
+                                            <p className="text-gray-400 text-sm mt-1">
+                                                Cancellation scheduled. Access
+                                                until{" "}
+                                                {new Date(
+                                                    user.pro_expires_at,
+                                                ).toLocaleDateString()}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="text-sm text-gray-400 space-y-1">
+                                    <p>Your Pro benefits include:</p>
+                                    <ul className="list-disc list-inside space-y-1 text-gray-500">
+                                        <li>
+                                            Unlimited flip transaction tracking
+                                        </li>
+                                        <li>
+                                            Full 3D viewer access for all free
+                                            MOCs
+                                        </li>
+                                        <li>MOC promotion in search results</li>
+                                        <li>Pro badge on your profile</li>
+                                    </ul>
+                                </div>
+
+                                {user?.pro_expires_at ? (
+                                    <button
+                                        onClick={async () => {
+                                            setIsResumingPro(true);
+                                            try {
+                                                await api.resumePro();
+                                                window.location.reload();
+                                            } catch (err: any) {
+                                                alert(
+                                                    err.message ||
+                                                        "Failed to resume",
+                                                );
+                                            } finally {
+                                                setIsResumingPro(false);
+                                            }
+                                        }}
+                                        disabled={isResumingPro}
+                                        className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {isResumingPro
+                                            ? "Resuming..."
+                                            : "Resume Subscription"}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={async () => {
+                                            if (
+                                                !confirm(
+                                                    "Are you sure you want to cancel your Pro subscription? You'll keep access until the end of your billing period.",
+                                                )
+                                            )
+                                                return;
+                                            setIsCancellingPro(true);
+                                            try {
+                                                await api.cancelPro();
+                                                window.location.reload();
+                                            } catch (err: any) {
+                                                alert(
+                                                    err.message ||
+                                                        "Failed to cancel",
+                                                );
+                                            } finally {
+                                                setIsCancellingPro(false);
+                                            }
+                                        }}
+                                        disabled={isCancellingPro}
+                                        className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {isCancellingPro
+                                            ? "Cancelling..."
+                                            : "Cancel Subscription"}
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <p className="text-gray-400">
+                                    Upgrade to Pro for $3.99/month to unlock
+                                    unlimited flip tracking, 3D viewer access
+                                    for all free MOCs, MOC promotion, and more.
+                                </p>
+                                <a
+                                    href="/pro"
+                                    className="inline-block px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 font-bold rounded-lg transition-all"
+                                >
+                                    Upgrade to Pro — $3.99/month
+                                </a>
+                            </div>
+                        )}
                     </div>
 
                     {/* Danger Zone */}

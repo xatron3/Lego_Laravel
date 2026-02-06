@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\SellerController;
+use App\Http\Controllers\Api\ProSubscriptionController;
+use App\Http\Controllers\Api\SiteSettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,6 +39,7 @@ Route::get('store', [StoreController::class, 'index']);
 */
 
 Route::post('webhook/stripe', [CheckoutController::class, 'webhook']);
+Route::post('webhook/stripe/subscription', [ProSubscriptionController::class, 'webhook']);
 
 /*
 |--------------------------------------------------------------------------
@@ -115,6 +118,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/analytics', [SellerController::class, 'analytics']);
     Route::get('/earnings', [SellerController::class, 'earnings']);
   });
+
+  // Pro subscription routes
+  Route::prefix('pro')->group(function () {
+    Route::get('/status', [ProSubscriptionController::class, 'status']);
+    Route::post('/subscribe', [ProSubscriptionController::class, 'subscribe']);
+    Route::post('/cancel', [ProSubscriptionController::class, 'cancel']);
+    Route::post('/resume', [ProSubscriptionController::class, 'resume']);
+  });
 });
 
 /*
@@ -131,6 +142,13 @@ Route::prefix('admin')->middleware(['auth:sanctum,web', 'role:admin'])->group(fu
   // Dashboard stats
   Route::get('/stats', [AdminController::class, 'stats']);
   Route::get('/sales', [AdminController::class, 'sales']);
+
+  // Site settings management
+  Route::get('/settings', [SiteSettingController::class, 'index']);
+  Route::post('/settings', [SiteSettingController::class, 'store']);
+  Route::get('/settings/{key}', [SiteSettingController::class, 'show']);
+  Route::put('/settings/{key}', [SiteSettingController::class, 'update']);
+  Route::delete('/settings/{key}', [SiteSettingController::class, 'destroy']);
 
   // User management
   Route::get('/users', [AdminController::class, 'users']);

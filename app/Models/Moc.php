@@ -132,6 +132,17 @@ class Moc extends Model
     });
   }
 
+  /**
+   * Scope to prioritize MOCs from Pro users.
+   * Pro users' MOCs appear first, then sorted by the fallback order.
+   */
+  public function scopeProPromoted(Builder $query): Builder
+  {
+    return $query->orderByRaw(
+      'EXISTS(SELECT 1 FROM users WHERE users.id = mocs.user_id AND users.is_pro = 1) DESC'
+    );
+  }
+
   // ==================== Accessors ====================
 
   /**

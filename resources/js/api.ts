@@ -59,7 +59,9 @@ export interface LegoModelData {
     user?: {
         id: number;
         name: string;
+        is_pro?: boolean;
     };
+    can_access_viewer?: boolean;
 }
 
 export interface InventoryPartData {
@@ -1311,6 +1313,121 @@ export const api = {
             credentials: "same-origin",
         });
         if (!response.ok) throw new Error("Failed to fetch admin sales");
+        return response.json();
+    },
+
+    // ==================== Pro Subscription ====================
+
+    async getProStatus(): Promise<{
+        is_pro: boolean;
+        pro_expires_at: string | null;
+        has_subscription: boolean;
+        price: string;
+    }> {
+        const response = await fetch(`${API_BASE}/pro/status`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch Pro status");
+        return response.json();
+    },
+
+    async subscribePro(): Promise<{
+        checkout_url: string;
+        session_id: string;
+    }> {
+        const response = await fetch(`${API_BASE}/pro/subscribe`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to subscribe");
+        }
+        return response.json();
+    },
+
+    async cancelPro(): Promise<{ message: string; pro_expires_at?: string }> {
+        const response = await fetch(`${API_BASE}/pro/cancel`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to cancel subscription");
+        }
+        return response.json();
+    },
+
+    async resumePro(): Promise<{ message: string }> {
+        const response = await fetch(`${API_BASE}/pro/resume`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to resume subscription");
+        }
+        return response.json();
+    },
+
+    // ==================== Admin Site Settings ====================
+
+    async getAdminSettings(): Promise<
+        Array<{
+            id: number;
+            key: string;
+            content: any;
+            description: string | null;
+        }>
+    > {
+        const response = await fetch(`${API_BASE}/admin/settings`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch site settings");
+        return response.json();
+    },
+
+    async updateAdminSetting(
+        key: string,
+        content: any,
+    ): Promise<{
+        id: number;
+        key: string;
+        content: any;
+        description: string | null;
+    }> {
+        const response = await fetch(`${API_BASE}/admin/settings/${key}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ content }),
+        });
+        if (!response.ok) throw new Error("Failed to update setting");
         return response.json();
     },
 };

@@ -2,6 +2,7 @@ import { Link } from "@inertiajs/react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import UserMenu from "./UserMenu";
+import ProBadge from "./ProBadge";
 
 interface HeaderProps {
     onOpenAuthModal?: () => void;
@@ -20,7 +21,7 @@ export default function Header({
     fixed = true,
     currentPage,
 }: HeaderProps) {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { isAuthenticated, isLoading, isPro } = useAuth();
     const { itemCount } = useCart();
 
     const navLinkClass = (page: string) => {
@@ -64,6 +65,21 @@ export default function Header({
                         >
                             Catalog
                         </Link>
+                        {!isPro && (
+                            <Link
+                                href="/pro"
+                                className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors flex items-center gap-1.5"
+                            >
+                                <svg
+                                    className="w-4 h-4"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                </svg>
+                                Pro
+                            </Link>
+                        )}
                     </nav>
 
                     <div className="flex items-center gap-4">

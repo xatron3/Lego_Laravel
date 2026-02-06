@@ -1,7 +1,13 @@
 import { useAuth } from "../contexts/AuthContext";
 
 interface AdminNavProps {
-    currentPage?: "dashboard" | "users" | "models" | "sales" | "data-import";
+    currentPage?:
+        | "dashboard"
+        | "users"
+        | "models"
+        | "sales"
+        | "data-import"
+        | "site-settings";
 }
 
 export default function AdminNav({ currentPage }: AdminNavProps) {
@@ -26,6 +32,12 @@ export default function AdminNav({ currentPage }: AdminNavProps) {
             id: "data-import",
             label: "Data Import",
             href: "/admin/data-import",
+            adminOnly: true,
+        },
+        {
+            id: "site-settings",
+            label: "Site Settings",
+            href: "/admin/site-settings",
             adminOnly: true,
         },
     ];
