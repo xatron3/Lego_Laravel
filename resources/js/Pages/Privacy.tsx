@@ -1,8 +1,12 @@
 import { Head, Link } from "@inertiajs/react";
+import { useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import AuthModal from "../components/AuthModal";
 
 export default function Privacy() {
+    const [showAuthModal, setShowAuthModal] = useState(false);
+
     return (
         <>
             <Head>
@@ -14,7 +18,7 @@ export default function Privacy() {
             </Head>
 
             <div className="min-h-screen bg-gray-900">
-                <Header />
+                <Header onOpenAuthModal={() => setShowAuthModal(true)} />
 
                 <div className="py-12 px-4 sm:px-6 lg:px-8">
                     <div className="max-w-4xl mx-auto">
@@ -388,6 +392,12 @@ export default function Privacy() {
                 </div>
 
                 <Footer />
+
+                {/* Auth Modal */}
+                <AuthModal
+                    isOpen={showAuthModal}
+                    onClose={() => setShowAuthModal(false)}
+                />
             </div>
         </>
     );

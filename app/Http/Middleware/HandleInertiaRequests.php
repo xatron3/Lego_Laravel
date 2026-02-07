@@ -55,6 +55,11 @@ class HandleInertiaRequests extends Middleware
       'cart' => [
         'count' => $request->user() ? $request->user()->cartItems()->count() : 0,
       ],
+      'notifications' => [
+        'unreadCount' => $request->user()
+          ? \App\Http\Controllers\Api\NotificationController::getUnreadCount($request->user())
+          : 0,
+      ],
     ];
   }
 }

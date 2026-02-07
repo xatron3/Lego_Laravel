@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
+use App\Models\Notification;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\SellerEarning;
@@ -346,6 +347,11 @@ class CheckoutController extends Controller
           'amount' => $item->seller_amount,
           'status' => 'pending',
         ]);
+
+        // Notify the seller about the sale
+        if ($item->moc) {
+          Notification::notifyMocSale($order->user, $item->moc, number_format($item->price, 2));
+        }
       }
 
       // Clear the user's cart

@@ -33,6 +33,7 @@ class User extends Authenticatable
     'pro_expires_at',
     'stripe_customer_id',
     'stripe_subscription_id',
+    'last_seen_notification_id',
   ];
 
   /**
@@ -401,6 +402,14 @@ class User extends Authenticatable
   public function posts(): HasMany
   {
     return $this->hasMany(Post::class);
+  }
+
+  /**
+   * Get the user's notifications.
+   */
+  public function notifications(): HasMany
+  {
+    return $this->hasMany(Notification::class);
   }
 
   /**

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\SellerController;
 use App\Http\Controllers\Api\ProSubscriptionController;
 use App\Http\Controllers\Api\SiteSettingController;
+use App\Http\Controllers\Api\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -120,6 +121,13 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::prefix('seller')->group(function () {
     Route::get('/analytics', [SellerController::class, 'analytics']);
     Route::get('/earnings', [SellerController::class, 'earnings']);
+  });
+
+  // Notification routes
+  Route::prefix('notifications')->group(function () {
+    Route::get('/', [NotificationController::class, 'index']);
+    Route::post('/mark-seen', [NotificationController::class, 'markSeen']);
+    Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
   });
 
   // Pro subscription routes

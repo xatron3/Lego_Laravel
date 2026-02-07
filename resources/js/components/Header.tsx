@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import UserMenu from "./UserMenu";
 import SearchBar from "./SearchBar";
+import NotificationBell from "./NotificationBell";
 
 interface HeaderProps {
     onOpenAuthModal?: () => void;
@@ -42,7 +43,9 @@ export default function Header({
     const { itemCount } = useCart();
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const menuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const searchRef = useRef<HTMLDivElement>(null);
 
     const menuItems: MenuItem[] = [
         {
@@ -204,6 +207,33 @@ export default function Header({
         };
     }, []);
 
+    // Close search when clicking outside on desktop
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (
+                searchRef.current &&
+                !searchRef.current.contains(event.target as Node)
+            ) {
+                setIsSearchExpanded(false);
+            }
+        }
+
+        function handleEscapeKey(event: KeyboardEvent) {
+            if (event.key === "Escape" && isSearchExpanded) {
+                setIsSearchExpanded(false);
+            }
+        }
+
+        if (isSearchExpanded) {
+            document.addEventListener("mousedown", handleClickOutside);
+            document.addEventListener("keydown", handleEscapeKey);
+            return () => {
+                document.removeEventListener("mousedown", handleClickOutside);
+                document.removeEventListener("keydown", handleEscapeKey);
+            };
+        }
+    }, [isSearchExpanded]);
+
     const navLinkClass = (item: MenuItem) => {
         const isActive = currentPage === item.page;
         if (item.highlight) {
@@ -345,8 +375,39 @@ export default function Header({
                     </nav>
 
                     {/* Search Bar - Desktop */}
-                    <div className="hidden md:block flex-1 max-w-md mx-4">
-                        <SearchBar />
+                    <div
+                        ref={searchRef}
+                        className={`hidden md:flex items-center transition-all duration-300 ease-in-out ${
+                            isSearchExpanded
+                                ? "flex-1 max-w-2xl mx-4"
+                                : "w-auto"
+                        }`}
+                    >
+                        {isSearchExpanded ? (
+                            <div className="w-full animate-slideInRight">
+                                <SearchBar autoFocus />
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsSearchExpanded(true)}
+                                className="p-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                                aria-label="Open search"
+                            >
+                                <svg
+                                    className="w-6 h-6"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                    />
+                                </svg>
+                            </button>
+                        )}
                     </div>
 
                     {/* Right Side Actions */}
@@ -377,6 +438,9 @@ export default function Header({
                                 )}
                             </Link>
                         )}
+
+                        {/* Notification Bell */}
+                        {isAuthenticated && <NotificationBell />}
 
                         {/* User Menu / Sign In */}
                         {isAuthenticated ? (
@@ -426,17 +490,17 @@ export default function Header({
                         </button>
                     </div>
                 </div>
-
-                {/* Mobile Search Bar */}
-                <div className="md:hidden pb-3">
-                    <SearchBar />
-                </div>
             </div>
 
             {/* Mobile Menu */}
             {isMobileMenuOpen && (
                 <div className="lg:hidden border-t border-gray-700 bg-gray-900/98 animate-slideDown">
-                    <div className="px-4 py-3 space-y-1">
+                    {/* Mobile Search Bar */}
+                    <div className="px-4 pt-3 pb-2">
+                        <SearchBar placeholder="Search..." />
+                    </div>
+
+                    <div className="px-4 py-3 space-y-1 border-t border-gray-700/50">
                         {menuItems.map((item) => (
                             <div key={item.label}>
                                 {item.href && !item.submenu ? (

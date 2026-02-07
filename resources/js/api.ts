@@ -1938,6 +1938,34 @@ export interface PaginatedResponse<T> {
     prev_page_url: string | null;
 }
 
+export type NotificationType =
+    | "new_follower"
+    | "post_like"
+    | "post_comment"
+    | "moc_sale";
+
+export interface NotificationData {
+    id: number;
+    user_id: number;
+    type: NotificationType;
+    actor_id: number | null;
+    notifiable_type: string | null;
+    notifiable_id: number | null;
+    data: {
+        message: string;
+        comment_preview?: string;
+        amount?: string;
+    } | null;
+    created_at: string;
+    updated_at: string;
+    actor: {
+        id: number;
+        name: string;
+        username: string | null;
+        avatar: string | null;
+    } | null;
+}
+
 export interface ProfileUser {
     id: number;
     name: string;
@@ -2229,6 +2257,44 @@ export const socialApi = {
             },
         );
         if (!response.ok) throw new Error("Failed to fetch following");
+        return response.json();
+    },
+
+    // ── Notifications ───────────────────────────────────────────────────
+
+    async getNotifications(
+        page = 1,
+    ): Promise<PaginatedResponse<NotificationData>> {
+        const response = await fetch(`${API_BASE}/notifications?page=${page}`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error("Failed to fetch notifications");
+        return response.json();
+    },
+
+    async markNotificationsSeen(): Promise<void> {
+        await ensureCsrfCookie();
+        const response = await fetch(`${API_BASE}/notifications/mark-seen`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                "X-XSRF-TOKEN": getCsrfToken(),
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok)
+            throw new Error("Failed to mark notifications as seen");
+    },
+
+    async getUnreadNotificationCount(): Promise<{ count: number }> {
+        const response = await fetch(`${API_BASE}/notifications/unread-count`, {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        if (!response.ok)
+            throw new Error("Failed to fetch unread notification count");
         return response.json();
     },
 };

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,9 @@ class FollowController extends Controller
     }
 
     $currentUser->follow($user);
+
+    // Send notification to the followed user
+    Notification::notifyNewFollower($currentUser, $user);
 
     return response()->json([
       'message' => 'Successfully followed user.',
