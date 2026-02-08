@@ -431,7 +431,7 @@ export default function MocEditModal({
                                                         key={image.id}
                                                         className="relative group"
                                                     >
-                                                        <div className="aspect-square rounded-lg overflow-hidden bg-gray-700">
+                                                        <div className="aspect-5/4 rounded-lg overflow-hidden bg-gray-700">
                                                             <img
                                                                 src={image.url}
                                                                 alt={`Image ${index + 1}`}
@@ -606,7 +606,7 @@ export default function MocEditModal({
                                                         key={index}
                                                         className="relative group"
                                                     >
-                                                        <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 ring-2 ring-green-500/50">
+                                                        <div className="aspect-5/4 rounded-lg overflow-hidden bg-gray-700 ring-2 ring-green-500/50">
                                                             <img
                                                                 src={
                                                                     preview.preview

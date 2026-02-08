@@ -254,7 +254,7 @@ export default function AdminSiteSettings() {
                                                         <img
                                                             src={moc.thumbnail}
                                                             alt=""
-                                                            className="w-10 h-10 rounded object-cover"
+                                                            className="w-10 h-8 rounded object-cover"
                                                         />
                                                     )}
                                                     <div>

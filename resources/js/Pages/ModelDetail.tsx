@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { router } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -12,6 +12,7 @@ import ProUpgradePrompt from "../components/ProUpgradePrompt";
 import Scene from "../Scene";
 import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
 import { api, LegoModelData, InventoryPartData } from "../api";
+import { parseStudioFile } from "../parser";
 
 interface ModelDetailProps {
     id: string;
@@ -37,6 +38,10 @@ export default function ModelDetail({ id }: ModelDetailProps) {
     // Image gallery state
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [showViewer, setShowViewer] = useState(false);
+
+    // Viewer state for pro section
+    const [viewerStep, setViewerStep] = useState(0);
+    const viewerOrbitControlsRef = useRef<any>(null);
 
     // Transform parts data for PartsDisplay component
     const partsForDisplay = useMemo<PartDisplayItem[]>(() => {
@@ -166,9 +171,26 @@ export default function ModelDetail({ id }: ModelDetailProps) {
     const isFree = model?.price === null || model?.price === 0;
     const isOwner = user && model?.user_id === user.id;
 
+    // Parse steps for viewer
+    const totalSteps = useMemo(() => {
+        if (!model?.ldr_content) return 0;
+        const steps = parseStudioFile(model.ldr_content);
+        return steps.length;
+    }, [model?.ldr_content]);
+
+    // Set viewer to last step when model loads
+    useEffect(() => {
+        if (totalSteps > 0) {
+            setViewerStep(totalSteps - 1);
+        }
+    }, [totalSteps]);
+
     return (
         <div className="min-h-screen bg-gray-900">
-            <Header currentPage="store" />
+            <Header
+                currentPage="store"
+                onOpenAuthModal={() => setShowAuthModal(true)}
+            />
 
             {/* Main Content */}
             <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -205,7 +227,7 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                 {/* Image Gallery / 3D Preview */}
                                 <div className="lg:w-1/2">
                                     {/* Main Image Display */}
-                                    <div className="aspect-square bg-gray-700 rounded-xl overflow-hidden relative mb-3">
+                                    <div className="aspect-5/4 bg-gray-700 rounded-xl overflow-hidden relative mb-3">
                                         {model.images &&
                                         model.images.length > 0 &&
                                         !showViewer ? (
@@ -329,7 +351,7 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                                                 false,
                                                             );
                                                         }}
-                                                        className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                                                        className={`shrink-0 w-16 h-[3.2rem] rounded-lg overflow-hidden border-2 transition-colors ${
                                                             selectedImageIndex ===
                                                                 index &&
                                                             !showViewer
@@ -351,7 +373,7 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                                     onClick={() =>
                                                         setShowViewer(true)
                                                     }
-                                                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors flex items-center justify-center bg-gray-600 ${
+                                                    className={`shrink-0 w-16 h-[3.2rem] rounded-lg overflow-hidden border-2 transition-colors flex items-center justify-center bg-gray-600 ${
                                                         showViewer
                                                             ? "border-yellow-500"
                                                             : "border-transparent hover:border-gray-500"
@@ -656,6 +678,113 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                     showSearch={true}
                                     allowedViews={["grid", "table", "compact"]}
                                 />
+                            </div>
+                        )}
+
+                        {/* 3D Viewer Section - Pro Users Only */}
+                        {model.ldr_content && (
+                            <div className="mt-6">
+                                {isPro ? (
+                                    <div className="bg-gray-800 rounded-2xl p-6">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div>
+                                                <h2 className="text-2xl font-bold text-white mb-1">
+                                                    3D Building Instructions
+                                                </h2>
+                                                <p className="text-gray-400 text-sm">
+                                                    Interactive step-by-step
+                                                    viewer
+                                                </p>
+                                            </div>
+                                            <ProBadge />
+                                        </div>
+
+                                        {/* Step Controls */}
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <button
+                                                onClick={() =>
+                                                    setViewerStep(
+                                                        Math.max(
+                                                            0,
+                                                            viewerStep - 1,
+                                                        ),
+                                                    )
+                                                }
+                                                disabled={viewerStep === 0}
+                                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <div className="flex-1 text-center">
+                                                <span className="text-white font-medium">
+                                                    Step {viewerStep + 1} of{" "}
+                                                    {totalSteps}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() =>
+                                                    setViewerStep(
+                                                        Math.min(
+                                                            totalSteps - 1,
+                                                            viewerStep + 1,
+                                                        ),
+                                                    )
+                                                }
+                                                disabled={
+                                                    viewerStep ===
+                                                    totalSteps - 1
+                                                }
+                                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+
+                                        {/* 3D Canvas */}
+                                        <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden">
+                                            <Canvas
+                                                gl={{
+                                                    preserveDrawingBuffer: true,
+                                                }}
+                                                camera={{
+                                                    position: [100, 100, 100],
+                                                    fov: 50,
+                                                }}
+                                            >
+                                                <ambientLight intensity={0.6} />
+                                                <directionalLight
+                                                    position={[10, 10, 5]}
+                                                    intensity={1}
+                                                />
+                                                <Scene
+                                                    modelText={
+                                                        model.ldr_content
+                                                    }
+                                                    currentStep={viewerStep}
+                                                    showGhostParts={false}
+                                                    dimPreviousSteps={true}
+                                                    previousStepsOpacity={0.3}
+                                                    showCurrentStepBorder={true}
+                                                    currentStepBorderColor="#facc15"
+                                                    orbitControlsRef={
+                                                        viewerOrbitControlsRef
+                                                    }
+                                                />
+                                                <OrbitControls
+                                                    ref={viewerOrbitControlsRef}
+                                                    enablePan
+                                                    enableZoom
+                                                    enableRotate
+                                                />
+                                            </Canvas>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <ProUpgradePrompt
+                                        feature="3D Building Instructions Viewer"
+                                        description="Upgrade to Pro to access the interactive 3D step-by-step building instructions viewer with full model visualization."
+                                    />
+                                )}
                             </div>
                         )}
                     </>

@@ -227,7 +227,7 @@ export default function SalesAnalytics() {
                                     key={moc.moc_id}
                                     className="flex items-center gap-4 bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors"
                                 >
-                                    <div className="w-16 h-16 bg-gray-600 rounded-lg flex-shrink-0 overflow-hidden">
+                                    <div className="w-16 h-[3.2rem] bg-gray-600 rounded-lg flex-shrink-0 overflow-hidden">
                                         {moc.moc_thumbnail ? (
                                             <img
                                                 src={moc.moc_thumbnail}
@@ -293,7 +293,7 @@ export default function SalesAnalytics() {
                                     key={sale.id}
                                     className="flex items-center gap-4 bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors"
                                 >
-                                    <div className="w-12 h-12 bg-gray-600 rounded-lg flex-shrink-0 overflow-hidden">
+                                    <div className="w-12 h-[2.4rem] bg-gray-600 rounded-lg flex-shrink-0 overflow-hidden">
                                         {sale.moc_thumbnail ? (
                                             <img
                                                 src={sale.moc_thumbnail}

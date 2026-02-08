@@ -145,7 +145,7 @@ export default function CheckoutSuccess({ session_id }: CheckoutSuccessProps) {
                                                 key={item.id}
                                                 className="flex items-center gap-4 bg-gray-700/50 rounded-lg p-3"
                                             >
-                                                <div className="w-12 h-12 bg-gray-600 rounded overflow-hidden shrink-0">
+                                                <div className="w-12 h-[2.4rem] bg-gray-600 rounded overflow-hidden shrink-0">
                                                     {item.moc?.thumbnail ? (
                                                         <img
                                                             src={

@@ -22,7 +22,9 @@ export default function SetTableRow({ set }: SetTableRowProps) {
             href={catalogSetUrl(set)}
             className="flex items-center gap-4 px-4 py-3 bg-gray-800/50 hover:bg-gray-700/50 border-b border-gray-700/50 transition-colors group"
         >
-            <div className="w-12 h-12 rounded-lg bg-gray-700 overflow-hidden shrink-0">
+            <div
+                className={`${isMoc && mocSet.thumbnail ? "w-15 h-12" : "w-12 h-12"} rounded-lg bg-gray-700 overflow-hidden shrink-0`}
+            >
                 {imageUrl && (
                     <img
                         src={imageUrl}

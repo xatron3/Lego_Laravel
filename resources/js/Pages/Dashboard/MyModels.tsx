@@ -95,7 +95,7 @@ export default function MyModels({ models, filter = "all" }: MyModelsProps) {
                                 key={model.id}
                                 className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700"
                             >
-                                <div className="aspect-video bg-gray-700 relative">
+                                <div className="aspect-5/4 bg-gray-700 relative">
                                     {model.thumbnail ? (
                                         <img
                                             src={`${model.thumbnail}`}

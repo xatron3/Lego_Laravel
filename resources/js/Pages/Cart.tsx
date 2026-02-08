@@ -144,7 +144,7 @@ export default function Cart() {
                                             })}
                                             className="shrink-0"
                                         >
-                                            <div className="w-24 h-24 bg-gray-700 rounded-lg overflow-hidden">
+                                            <div className="w-24 h-[4.8rem] bg-gray-700 rounded-lg overflow-hidden">
                                                 {item.moc?.thumbnail ? (
                                                     <img
                                                         src={item.moc.thumbnail}
@@ -153,6 +153,7 @@ export default function Cart() {
                                                     />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center">
+                                                        \n{" "}
                                                         <svg
                                                             className="w-8 h-8 text-gray-600"
                                                             fill="currentColor"

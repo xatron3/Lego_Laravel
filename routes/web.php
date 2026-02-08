@@ -97,15 +97,15 @@ Route::get('/about', function () {
 |--------------------------------------------------------------------------
 */
 
-// Login page - for unauthenticated users
+// Login page - redirect authenticated users to dashboard
 Route::get('/login', function () {
   return Inertia::render('Login');
-})->name('login');
+})->middleware('guest')->name('login');
 
-// Dashboard - user profile and model management
+// Dashboard - user profile and model management (requires auth)
 Route::get('/dashboard', function () {
   return Inertia::render('Dashboard');
-})->name('dashboard');
+})->middleware('auth')->name('dashboard');
 
 // Dashboard sub-pages (requires auth)
 Route::middleware(['auth'])->prefix('dashboard')->group(function () {

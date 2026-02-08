@@ -25,12 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
       \App\Http\Middleware\HandleInertiaRequests::class,
     ]);
 
-    // Apply session middleware to API routes for Sanctum SPA authentication
-    // Sanctum's EnsureFrontendRequestsAreStateful will handle CSRF validation
-    $middleware->group('api', [
-      \Illuminate\Cookie\Middleware\EncryptCookies::class,
-      \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-      \Illuminate\Session\Middleware\StartSession::class,
+    // Sanctum SPA authentication handles session, cookies, and CSRF for stateful requests
+    $middleware->api(prepend: [
       \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
     ]);
 

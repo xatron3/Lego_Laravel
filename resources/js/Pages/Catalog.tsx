@@ -324,7 +324,7 @@ function MocCard({ moc }: { moc: CatalogMocItem }) {
             href={catalogSetUrl(moc)}
             className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-yellow-500 transition-colors group block"
         >
-            <div className="aspect-square bg-gray-700 relative overflow-hidden">
+            <div className="aspect-5/4 bg-gray-700 relative overflow-hidden">
                 <img
                     src={imageUrl}
                     alt={moc.name}

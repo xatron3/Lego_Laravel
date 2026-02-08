@@ -640,6 +640,10 @@ export default function MocSubmitWizard({
                                             JPEG, PNG, GIF, or WebP (max 5MB
                                             each)
                                         </p>
+                                        <p className="text-yellow-500 text-sm mt-2 font-medium">
+                                            💡 Best results: 5:4 aspect ratio
+                                            (e.g., 1000×800px)
+                                        </p>
                                     </label>
                                 </div>
                             </div>
@@ -664,7 +668,7 @@ export default function MocSubmitWizard({
                                             key={index}
                                             className="relative group"
                                         >
-                                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-700">
+                                            <div className="aspect-5/4 rounded-lg overflow-hidden bg-gray-700">
                                                 <img
                                                     src={preview.preview}
                                                     alt={`Preview ${index + 1}`}
@@ -915,7 +919,7 @@ export default function MocSubmitWizard({
                                                 key={index}
                                                 className="relative shrink-0"
                                             >
-                                                <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-700">
+                                                <div className="w-20 h-16 rounded-lg overflow-hidden bg-gray-700">
                                                     <img
                                                         src={preview.preview}
                                                         alt={`Preview ${index + 1}`}

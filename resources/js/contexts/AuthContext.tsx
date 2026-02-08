@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
+import { getCsrfToken, ensureCsrfCookie } from "../api";
 
 export interface User {
     id: number;
@@ -54,22 +55,6 @@ const roleHierarchy: Record<User["role"], number> = {
     admin: 3,
 };
 
-function getCsrfToken(): string {
-    const metaToken = document
-        .querySelector('meta[name="csrf-token"]')
-        ?.getAttribute("content");
-    if (metaToken) return metaToken;
-
-    const cookie = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("XSRF-TOKEN="));
-    if (cookie) {
-        return decodeURIComponent(cookie.split("=")[1]);
-    }
-
-    return "";
-}
-
 export function AuthProvider({
     children,
     initialUser,
@@ -99,37 +84,43 @@ export function AuthProvider({
     };
 
     const login = async (email: string, password: string, remember = false) => {
-        // Get CSRF cookie first
-        await fetch("/sanctum/csrf-cookie", {
-            credentials: "same-origin",
-        });
+        setIsLoading(true);
 
-        const response = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                "X-CSRF-TOKEN": getCsrfToken(),
-                "X-XSRF-TOKEN": getCsrfToken(),
-            },
-            credentials: "same-origin",
-            body: JSON.stringify({ email, password, remember }),
-        });
+        try {
+            // Ensure CSRF cookie is fresh before authenticating
+            await ensureCsrfCookie();
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(
-                error.message || error.errors?.email?.[0] || "Login failed",
-            );
-        }
+            const response = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ email, password, remember }),
+            });
 
-        const userData = await response.json();
-        console.log("Login response:", userData);
-        // Verify we got valid user data
-        if (userData && userData.id) {
-            setUser(userData);
-        } else {
-            throw new Error("Invalid response from server");
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(
+                    error.message || error.errors?.email?.[0] || "Login failed",
+                );
+            }
+
+            const userData = await response.json();
+
+            if (userData && userData.id) {
+                setUser(userData);
+                setIsLoading(false);
+                // Reload Inertia props to sync server session state
+                router.reload({ only: ["auth", "cart", "notifications"] });
+            } else {
+                throw new Error("Invalid response from server");
+            }
+        } catch (error) {
+            setIsLoading(false);
+            throw error;
         }
     };
 
@@ -139,63 +130,84 @@ export function AuthProvider({
         password: string,
         passwordConfirmation: string,
     ) => {
-        // Get CSRF cookie first
-        await fetch("/sanctum/csrf-cookie", {
-            credentials: "same-origin",
-        });
+        setIsLoading(true);
 
-        const response = await fetch("/api/auth/register", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                "X-CSRF-TOKEN": getCsrfToken(),
-                "X-XSRF-TOKEN": getCsrfToken(),
-            },
-            credentials: "same-origin",
-            body: JSON.stringify({
-                name,
-                email,
-                password,
-                password_confirmation: passwordConfirmation,
-            }),
-        });
+        try {
+            // Ensure CSRF cookie is fresh before authenticating
+            await ensureCsrfCookie();
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(
-                error.message ||
-                    error.errors?.email?.[0] ||
-                    error.errors?.password?.[0] ||
-                    "Registration failed",
-            );
-        }
+            const response = await fetch("/api/auth/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-XSRF-TOKEN": getCsrfToken(),
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                    name,
+                    email,
+                    password,
+                    password_confirmation: passwordConfirmation,
+                }),
+            });
 
-        const userData = await response.json();
-        // Verify we got valid user data
-        if (userData && userData.id) {
-            setUser(userData);
-        } else {
-            throw new Error("Invalid response from server");
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(
+                    error.message ||
+                        error.errors?.email?.[0] ||
+                        error.errors?.password?.[0] ||
+                        "Registration failed",
+                );
+            }
+
+            const userData = await response.json();
+
+            if (userData && userData.id) {
+                setUser(userData);
+                setIsLoading(false);
+                // Reload Inertia props to sync server session state
+                router.reload({ only: ["auth", "cart", "notifications"] });
+            } else {
+                throw new Error("Invalid response from server");
+            }
+        } catch (error) {
+            setIsLoading(false);
+            throw error;
         }
     };
 
     const logout = async () => {
+        setIsLoading(true);
+
         try {
-            await fetch("/api/auth/logout", {
+            // Await server-side session invalidation before redirecting
+            const response = await fetch("/api/auth/logout", {
                 method: "POST",
                 headers: {
                     Accept: "application/json",
-                    "X-CSRF-TOKEN": getCsrfToken(),
                     "X-XSRF-TOKEN": getCsrfToken(),
                 },
                 credentials: "same-origin",
             });
+
+            // Wait for response to ensure Set-Cookie headers are processed
+            await response.json();
+
+            // Clear user state after successful logout
             setUser(null);
-            // Redirect to home page after logout
-            router.visit("/", { replace: true });
+            setIsLoading(false);
+
+            // Use window.location for full page reload to ensure cookies are cleared
+            // This is more reliable than Inertia navigation for logout
+            window.location.href = "/";
         } catch (error) {
             console.error("Logout error:", error);
+            // Even if logout fails on server, clear client state
+            setUser(null);
+            setIsLoading(false);
+            window.location.href = "/";
         }
     };
 

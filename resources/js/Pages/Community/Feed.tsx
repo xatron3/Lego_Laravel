@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Head, router } from "@inertiajs/react";
 import Header from "../../components/Header";
+import AuthModal from "../../components/AuthModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { PostData, PaginatedResponse, socialApi } from "../../api";
 import PostCard from "../../components/community/PostCard";
@@ -12,6 +13,7 @@ interface FeedProps {
 
 export default function Feed({ initialPosts }: FeedProps) {
     const { isAuthenticated } = useAuth();
+    const [showAuthModal, setShowAuthModal] = useState(false);
     const [posts, setPosts] = useState<PostData[]>(initialPosts.data);
     const [currentPage, setCurrentPage] = useState(initialPosts.current_page);
     const [lastPage, setLastPage] = useState(initialPosts.last_page);
@@ -44,7 +46,14 @@ export default function Feed({ initialPosts }: FeedProps) {
     return (
         <div className="min-h-screen bg-gray-900">
             <Head title="Community Feed" />
-            <Header currentPage="community" />
+            <Header
+                currentPage="community"
+                onOpenAuthModal={() => setShowAuthModal(true)}
+            />
+            <AuthModal
+                isOpen={showAuthModal}
+                onClose={() => setShowAuthModal(false)}
+            />
 
             <div className="max-w-2xl mx-auto px-4 pt-24 pb-12">
                 {/* Page Header */}
