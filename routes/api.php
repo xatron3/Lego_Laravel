@@ -11,18 +11,31 @@ use App\Http\Controllers\Api\SellerController;
 use App\Http\Controllers\Api\ProSubscriptionController;
 use App\Http\Controllers\Api\SiteSettingController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\AuthController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Core API routes for the application. Authentication, admin, and catalog
-| routes are organized in separate files (auth.php, admin.php, catalog.php)
-| for better maintainability. Auth routes are in routes/auth.php with
-| explicit session middleware configuration.
+| Core API routes for the application. These routes inherit the api
+| middleware group which includes session + cookie middleware for
+| Sanctum stateful authentication.
 |
 */
+
+/*
+|--------------------------------------------------------------------------
+| Authentication Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('auth')->group(function () {
+    Route::get('/user', [AuthController::class, 'user']);
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
 
 /*
 |--------------------------------------------------------------------------

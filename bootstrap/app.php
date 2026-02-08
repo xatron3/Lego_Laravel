@@ -30,6 +30,13 @@ return Application::configure(basePath: dirname(__DIR__))
       \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
     ]);
 
+    // Add session middleware to API routes for Sanctum stateful authentication
+    $middleware->api(append: [
+      \Illuminate\Cookie\Middleware\EncryptCookies::class,
+      \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+      \Illuminate\Session\Middleware\StartSession::class,
+    ]);
+
     // Exclude XSRF-TOKEN from encryption so JavaScript can read it
     $middleware->encryptCookies(except: [
       'XSRF-TOKEN',

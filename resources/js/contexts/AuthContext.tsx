@@ -182,8 +182,7 @@ export function AuthProvider({
         setIsLoading(true);
 
         try {
-            // Await server-side session invalidation before redirecting
-            const response = await fetch("/api/auth/logout", {
+            await fetch("/api/auth/logout", {
                 method: "POST",
                 headers: {
                     Accept: "application/json",
@@ -191,22 +190,12 @@ export function AuthProvider({
                 },
                 credentials: "same-origin",
             });
-
-            // Wait for response to ensure Set-Cookie headers are processed
-            await response.json();
-
-            // Clear user state after successful logout
-            setUser(null);
-            setIsLoading(false);
-
-            // Use window.location for full page reload to ensure cookies are cleared
-            // This is more reliable than Inertia navigation for logout
-            window.location.href = "/";
         } catch (error) {
             console.error("Logout error:", error);
-            // Even if logout fails on server, clear client state
+        } finally {
             setUser(null);
             setIsLoading(false);
+            // Full page reload clears all client state and picks up invalidated session
             window.location.href = "/";
         }
     };

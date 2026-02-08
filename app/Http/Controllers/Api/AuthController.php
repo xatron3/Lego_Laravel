@@ -99,7 +99,7 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        // Use web guard explicitly since sanctum guard doesn't have logout method
+        // Use the web (session) guard — Sanctum's guard has no logout()
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

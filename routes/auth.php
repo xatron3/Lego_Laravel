@@ -2,37 +2,20 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\GoogleController;
-use App\Http\Controllers\Api\AuthController;
 
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
 |--------------------------------------------------------------------------
 |
-| All authentication-related routes including API auth, OAuth, and CSRF.
+| Google OAuth routes. API auth routes (login, register, logout) are
+| defined in routes/api.php to inherit the API middleware group which
+| provides session and cookie support via Sanctum.
 |
 */
-
-// CSRF Cookie Route (Required for Sanctum SPA Auth)
-Route::get('/sanctum/csrf-cookie', function () {
-    return response()->json(['message' => 'CSRF cookie set']);
-});
 
 // Google OAuth Routes - need web middleware for session/redirect support
 Route::middleware('web')->group(function () {
     Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('auth.google');
     Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('auth.google.callback');
-});
-
-// API Authentication Routes - ensure session middleware is applied
-Route::prefix('api/auth')->middleware([
-    \Illuminate\Cookie\Middleware\EncryptCookies::class,
-    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-    \Illuminate\Session\Middleware\StartSession::class,
-    \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-])->group(function () {
-    Route::get('/user', [AuthController::class, 'user']);
-    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
-    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
