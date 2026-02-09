@@ -109,3 +109,14 @@ export function catalogCategoryUrl(category: {
 }): string {
     return `/catalog/categories/${category.id}/${slugify(category.name)}`;
 }
+
+/**
+ * Generate LEGO official instructions URL
+ * Strips -1 suffix from set number if present
+ * Format: https://www.lego.com/en-us/service/building-instructions/{setNum}
+ */
+export function legoInstructionsUrl(setNum: string): string {
+    // Strip -1 suffix if present (e.g., "75192-1" -> "75192")
+    const cleanSetNum = setNum.replace(/-1$/, "");
+    return `https://www.lego.com/en-us/service/building-instructions/${cleanSetNum}`;
+}
