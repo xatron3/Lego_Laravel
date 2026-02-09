@@ -11,19 +11,19 @@ import { mocUrl } from "../utils/seoUrls";
 type SortOption = "newest" | "popular" | "price_low" | "price_high" | "name";
 type FilterOption = "all" | "free" | "paid";
 
-interface StoreProps {
+interface MocsProps {
     initialModels?: LegoModelData[];
     initialSort?: SortOption;
     initialFilter?: FilterOption;
     initialSearch?: string;
 }
 
-export default function Store({
+export default function Mocs({
     initialModels = [],
     initialSort = "newest",
     initialFilter = "all",
     initialSearch = "",
-}: StoreProps) {
+}: MocsProps) {
     const { isAuthenticated, user } = useAuth();
     const { isInCart, addToCart } = useCart();
     const [showAuthModal, setShowAuthModal] = useState(false);

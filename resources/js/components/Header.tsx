@@ -54,9 +54,9 @@ export default function Header({
             page: "home",
         },
         {
-            label: "Store",
-            href: "/store",
-            page: "store",
+            label: "MOCs",
+            href: "/mocs",
+            page: "mocs",
         },
         {
             label: "Catalog",
@@ -172,15 +172,6 @@ export default function Header({
                       label: "Community",
                       href: "/community",
                       page: "community",
-                  },
-              ]
-            : []),
-        ...(!isPro
-            ? [
-                  {
-                      label: "Pro",
-                      href: "/pro",
-                      highlight: true,
                   },
               ]
             : []),

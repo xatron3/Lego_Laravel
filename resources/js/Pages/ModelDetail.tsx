@@ -277,7 +277,8 @@ export default function ModelDetail({ id }: ModelDetailProps) {
                                                     modelText={
                                                         model.ldr_content
                                                     }
-                                                    currentStep={0}
+                                                    // Set current step to last step
+                                                    currentStep={viewerStep}
                                                     showGhostParts={false}
                                                     dimPreviousSteps={false}
                                                     previousStepsOpacity={1}
