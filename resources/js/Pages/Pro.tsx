@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "@inertiajs/react";
+import { Link, Head } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useAuth } from "../contexts/AuthContext";
@@ -212,6 +212,31 @@ export default function Pro({ isPro, demoMocs, flipLimit, price }: ProProps) {
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    BrickOasis Pro - Premium LEGO Features & Tools | {price}
+                    /month
+                </title>
+                <meta
+                    name="description"
+                    content={`Upgrade to BrickOasis Pro for ${price}/month. Get advanced 3D viewer features, unlimited flip tracking, MOC promotion, priority support, and exclusive tools for serious LEGO builders and collectors.`}
+                />
+                <meta
+                    name="keywords"
+                    content="BrickOasis Pro, LEGO premium, MOC tools, LEGO viewer, flip tracking, LEGO profit, builder tools, LEGO subscription"
+                />
+                <meta
+                    property="og:title"
+                    content={`BrickOasis Pro - Premium LEGO Features | ${price}/month`}
+                />
+                <meta
+                    property="og:description"
+                    content="Unlock advanced LEGO building and collecting tools. Premium 3D viewer, unlimited tracking, and exclusive features."
+                />
+                <meta property="og:type" content="website" />
+                <link rel="canonical" href={`${window.location.origin}/pro`} />
+            </Head>
+
             <Header onOpenAuthModal={() => setShowAuthModal(true)} />
 
             {/* Hero Section */}

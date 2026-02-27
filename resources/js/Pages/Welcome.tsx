@@ -75,24 +75,24 @@ export default function Welcome({
         <>
             <Head>
                 <title>
-                    BrickOasis - 3D LEGO LDraw Viewer, Building Instructions &
+                    BrickOasis - LEGO Building Instructions, 3D Model Viewer &
                     MOC Marketplace
                 </title>
                 <meta
                     name="description"
-                    content="Explore, view, and share LEGO LDraw models with our advanced 3D viewer featuring step-by-step building instructions. Discover thousands of MOCs, track your LEGO investments, and join a thriving builder community."
+                    content="Explore and share LEGO models with our interactive 3D viewer featuring step-by-step building instructions. Discover thousands of MOCs, track your LEGO collection, and join a thriving builder community."
                 />
                 <meta
                     name="keywords"
-                    content="LEGO, LDraw, 3D viewer, MOC, building instructions, LEGO marketplace, LEGO flipping, LEGO sets, custom builds"
+                    content="LEGO, 3D viewer, MOC, building instructions, LEGO marketplace, LEGO investing, LEGO sets, MOCs, LEGO community"
                 />
                 <meta
                     property="og:title"
-                    content="BrickOasis - 3D LEGO LDraw Viewer & MOC Marketplace"
+                    content="BrickOasis - LEGO 3D Viewer & MOC Marketplace"
                 />
                 <meta
                     property="og:description"
-                    content="View LEGO LDraw models in stunning 3D with step-by-step instructions. Browse thousands of MOCs and manage your LEGO collection."
+                    content="View LEGO models in stunning 3D with step-by-step instructions. Browse thousands of MOCs and manage your LEGO collection."
                 />
                 <meta property="og:type" content="website" />
                 <link rel="canonical" href={window.location.origin} />
@@ -114,19 +114,17 @@ export default function Welcome({
                                 Your LEGO Dreams
                             </h1>
                             <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto mb-4">
-                                The ultimate platform for LEGO enthusiasts.
-                                Explore thousands of LDraw models with our
-                                powerful 3D viewer, discover step-by-step
-                                building instructions, and manage your LEGO
-                                investment portfolio.
+                                The ultimate platform for LEGO builders and
+                                collectors. Explore thousands of models with our
+                                interactive 3D viewer, discover step-by-step
+                                building instructions, and track your LEGO
+                                collection value.
                             </p>
                             <p className="text-lg text-gray-400 max-w-3xl mx-auto">
                                 Join {stats.total_users.toLocaleString()}{" "}
                                 builders exploring{" "}
                                 {stats.total_sets.toLocaleString()} official
-                                LEGO sets and{" "}
-                                {stats.total_models.toLocaleString()} custom
-                                MOCs powered by Three.js technology.
+                                LEGO sets and custom designs.
                             </p>
                         </div>
 
@@ -142,12 +140,6 @@ export default function Welcome({
                                 className="px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold text-lg rounded-xl transition-all border border-gray-600"
                             >
                                 Explore MOCs
-                            </Link>
-                            <Link
-                                href="/viewer"
-                                className="px-8 py-4 bg-transparent hover:bg-gray-800 text-yellow-400 font-semibold text-lg rounded-xl transition-all border-2 border-yellow-500/50 hover:border-yellow-400"
-                            >
-                                Try 3D Viewer
                             </Link>
                         </div>
 
@@ -179,7 +171,7 @@ export default function Welcome({
                                         clipRule="evenodd"
                                     />
                                 </svg>
-                                <span>.ldr & .mpd Compatible</span>
+                                <span>Studio Files Supported</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <svg
@@ -467,8 +459,7 @@ export default function Welcome({
                                 Community Creations
                             </h2>
                             <p className="text-gray-400 text-lg">
-                                Amazing custom MOCs from talented builders
-                                worldwide
+                                Amazing MOCs from talented builders worldwide
                             </p>
                         </div>
 
@@ -629,13 +620,13 @@ export default function Welcome({
                                         </svg>
                                     </div>
                                     <h3 className="text-2xl font-bold text-white mb-4">
-                                        Advanced 3D LDraw Viewer
+                                        Interactive 3D Model Viewer
                                     </h3>
                                     <p className="text-gray-300 mb-6 leading-relaxed">
                                         Experience LEGO models like never before
-                                        with our cutting-edge Three.js powered
-                                        viewer. Navigate through step-by-step
-                                        building instructions, rotate models in
+                                        with our powerful 3D viewer. Navigate
+                                        through step-by-step building
+                                        instructions, rotate models in
                                         real-time, and explore every detail in
                                         stunning 3D.
                                     </p>
@@ -688,8 +679,8 @@ export default function Welcome({
                                                 />
                                             </svg>
                                             <span>
-                                                Native .ldr and .mpd file format
-                                                support
+                                                Studio file format support
+                                                (.ldr, .mpd)
                                             </span>
                                         </li>
                                         <li className="flex items-start gap-3 text-gray-300">
@@ -876,8 +867,8 @@ export default function Welcome({
                                     Easy Upload & Share
                                 </h3>
                                 <p className="text-gray-400">
-                                    Upload your LDraw creations and share them
-                                    with the community. Set pricing for premium
+                                    Upload your Studio files and share them with
+                                    the community. Set pricing for premium
                                     models or offer them free.
                                 </p>
                             </div>

@@ -49,7 +49,7 @@ class CatalogPageController extends Controller
         'year' => $set->year,
         'num_parts' => $set->num_parts,
         'theme' => $set->theme ? ['id' => $set->theme->id, 'name' => $set->theme->name] : null,
-        'image_url' => $set->custom_image ? "/storage/{$set->custom_image}" : "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
+        'image_url' => $set->img_url ?? ($set->custom_image ? "/storage/{$set->custom_image}" : "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg"),
       ]);
 
     // Popular MOCs (from the Moc model - public, with images)
@@ -117,7 +117,7 @@ class CatalogPageController extends Controller
         'year' => $set->year,
         'num_parts' => $set->num_parts,
         'theme' => $set->theme ? ['id' => $set->theme->id, 'name' => $set->theme->name] : null,
-        'image_url' => "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
+        'image_url' => $set->img_url ?? "https://cdn.rebrickable.com/media/sets/{$set->set_num}.jpg",
       ]);
 
     return Inertia::render('Catalog', [

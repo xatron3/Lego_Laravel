@@ -20,15 +20,17 @@ class ImportRebrickableData implements ShouldQueue
 
     private string $jobId;
     private ?string $table;
+    private bool $forceUpdate;
     private array $tableConfig;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(?string $table = null, string $jobId = null)
+    public function __construct(?string $table = null, ?string $jobId = null, bool $forceUpdate = false)
     {
         $this->table = $table;
         $this->jobId = $jobId ?? uniqid('import_', true);
+        $this->forceUpdate = $forceUpdate;
 
         $this->tableConfig = [
             'themes' => [
@@ -54,12 +56,12 @@ class ImportRebrickableData implements ShouldQueue
             'minifigs' => [
                 'model' => \App\Models\Minifig::class,
                 'primaryKey' => 'fig_num',
-                'columns' => ['fig_num', 'name', 'num_parts'],
+                'columns' => ['fig_num', 'name', 'num_parts', 'img_url'],
             ],
             'sets' => [
                 'model' => \App\Models\Set::class,
                 'primaryKey' => 'set_num',
-                'columns' => ['set_num', 'name', 'year', 'theme_id', 'num_parts'],
+                'columns' => ['set_num', 'name', 'year', 'theme_id', 'num_parts', 'img_url'],
             ],
             'inventories' => [
                 'model' => \App\Models\Inventory::class,
@@ -207,7 +209,7 @@ class ImportRebrickableData implements ShouldQueue
         }
 
         // Read header
-        $header = fgetcsv($handle);
+        $header = fgetcsv($handle, 0, ',', '"', '');
         if ($header === false) {
             fclose($handle);
             throw new \Exception("Cannot read CSV header");
@@ -241,7 +243,7 @@ class ImportRebrickableData implements ShouldQueue
         $batchSize = 500;
         $totalProcessed = 0;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
             $data = [];
             foreach ($config['columns'] as $column) {
                 if (isset($columnMap[$column])) {
@@ -250,16 +252,19 @@ class ImportRebrickableData implements ShouldQueue
                 }
             }
 
-            // Skip rows with missing required data
-            if ($config['primaryKey'] && empty($data[$config['primaryKey']])) {
+            // Skip rows with missing required data (but allow 0 as valid ID)
+            if ($config['primaryKey'] && ($data[$config['primaryKey']] === null || $data[$config['primaryKey']] === '')) {
                 continue;
             }
 
-            // Skip if record already exists (based on primary key)
+            // Skip if record already exists (based on primary key), unless forceUpdate is enabled
             if ($config['primaryKey'] && isset($existingKeys[$data[$config['primaryKey']]])) {
-                $skipped++;
-                $totalProcessed++;
-                continue;
+                if (!$this->forceUpdate) {
+                    $skipped++;
+                    $totalProcessed++;
+                    continue;
+                }
+                // In forceUpdate mode, this record will be updated
             }
 
             $batch[] = $data;
@@ -308,7 +313,7 @@ class ImportRebrickableData implements ShouldQueue
     }
 
     /**
-     * Insert a batch of records (skips duplicates).
+     * Insert a batch of records (skips duplicates or updates if forceUpdate is enabled).
      */
     private function insertBatch(string $table, array $batch): int
     {
@@ -316,20 +321,42 @@ class ImportRebrickableData implements ShouldQueue
 
         // Add timestamps to all records
         foreach ($batch as &$record) {
-            $record['created_at'] = $now;
+            if (!isset($record['created_at'])) {
+                $record['created_at'] = $now;
+            }
             $record['updated_at'] = $now;
         }
 
         try {
-            // Use insertOrIgnore to skip duplicates
-            DB::table($table)->insertOrIgnore($batch);
+            if ($this->forceUpdate) {
+                // Use upsert to insert or update records
+                $config = $this->tableConfig[$table] ?? null;
+                if ($config && $config['primaryKey']) {
+                    DB::table($table)->upsert($batch, [$config['primaryKey']], array_keys($batch[0]));
+                } else {
+                    // No primary key, just insert and ignore duplicates
+                    DB::table($table)->insertOrIgnore($batch);
+                }
+            } else {
+                // Use insertOrIgnore to skip duplicates
+                DB::table($table)->insertOrIgnore($batch);
+            }
             return count($batch);
         } catch (\Exception $e) {
-            // Fallback to individual inserts
+            // Fallback to individual inserts/updates
             $inserted = 0;
             foreach ($batch as $record) {
                 try {
-                    DB::table($table)->insertOrIgnore($record);
+                    if ($this->forceUpdate) {
+                        $config = $this->tableConfig[$table] ?? null;
+                        if ($config && $config['primaryKey']) {
+                            DB::table($table)->upsert([$record], [$config['primaryKey']], array_keys($record));
+                        } else {
+                            DB::table($table)->insertOrIgnore($record);
+                        }
+                    } else {
+                        DB::table($table)->insertOrIgnore($record);
+                    }
                     $inserted++;
                 } catch (\Exception $e2) {
                     // Skip individual failures
@@ -350,7 +377,7 @@ class ImportRebrickableData implements ShouldQueue
         }
 
         $count = 0;
-        fgetcsv($handle); // Skip header
+        fgetcsv($handle, 0, ',', '"', ''); // Skip header
         while (fgets($handle) !== false) {
             $count++;
         }

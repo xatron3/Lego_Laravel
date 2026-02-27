@@ -45,7 +45,33 @@ export default function Feed({ initialPosts }: FeedProps) {
 
     return (
         <div className="min-h-screen bg-gray-900">
-            <Head title="Community Feed" />
+            <Head>
+                <title>
+                    Community Feed - LEGO Builder Community | BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content="Join the BrickOasis LEGO builder community. Share your builds, discover inspiration, and connect with fellow LEGO enthusiasts. Follow builders, like creations, and engage with the community."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO community, LEGO builders, LEGO social, share builds, LEGO creations, builder feed, LEGO inspiration"
+                />
+                <meta
+                    property="og:title"
+                    content="Community Feed - LEGO Builder Community | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Join the LEGO builder community. Share, discover, and connect with fellow builders."
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/community`}
+                />
+            </Head>
+
             <Header
                 currentPage="community"
                 onOpenAuthModal={() => setShowAuthModal(true)}

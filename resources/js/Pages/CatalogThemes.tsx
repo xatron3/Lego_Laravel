@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Head } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
 import Footer from "../components/Footer";
@@ -62,6 +63,33 @@ export default function CatalogThemes({ stats }: CatalogThemesProps) {
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    LEGO Themes - Browse All Themes & Categories | BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content="Explore all LEGO themes and categories. From Star Wars and Harry Potter to City and Technic, discover every LEGO theme with complete set listings and hierarchical organization."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO themes, LEGO categories, Star Wars LEGO, Harry Potter LEGO, City LEGO, Technic LEGO, theme catalog"
+                />
+                <meta
+                    property="og:title"
+                    content="LEGO Themes - Complete List | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Browse all LEGO themes and categories with complete set listings. Discover your favorite LEGO collections."
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/catalog/themes`}
+                />
+            </Head>
+
             <Header
                 currentPage="catalog"
                 onOpenAuthModal={() => setShowAuthModal(true)}

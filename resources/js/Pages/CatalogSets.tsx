@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Head } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
 import Footer from "../components/Footer";
@@ -126,6 +127,31 @@ export default function CatalogSets({ themes, yearRange }: CatalogSetsProps) {
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>LEGO Sets - Browse Official Sets | BrickOasis</title>
+                <meta
+                    name="description"
+                    content="Browse and search thousands of official LEGO sets. Filter by theme, year, and piece count. View detailed parts inventory, building instructions, and set information for every LEGO set ever released."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO sets, official LEGO sets, LEGO themes, LEGO database, set catalog, building instructions, parts inventory, BrickLink sets"
+                />
+                <meta
+                    property="og:title"
+                    content="LEGO Sets - Complete Catalog | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Browse thousands of official LEGO sets with detailed parts inventory and building instructions. Search by theme, year, or piece count."
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/catalog/sets`}
+                />
+            </Head>
+
             <Header
                 currentPage="catalog"
                 onOpenAuthModal={() => setShowAuthModal(true)}

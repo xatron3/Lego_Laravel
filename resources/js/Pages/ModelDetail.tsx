@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { router } from "@inertiajs/react";
+import { router, Head } from "@inertiajs/react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,7 +11,7 @@ import ProBadge from "../components/ProBadge";
 import ProUpgradePrompt from "../components/ProUpgradePrompt";
 import Scene from "../Scene";
 import PartsDisplay, { PartDisplayItem } from "../components/PartsDisplay";
-import { api, LegoModelData, InventoryPartData } from "../api";
+import { api, LegoModelData } from "../api";
 import { parseStudioFile } from "../parser";
 
 interface ModelDetailProps {
@@ -185,8 +185,24 @@ export default function ModelDetail({ id }: ModelDetailProps) {
         }
     }, [totalSteps]);
 
+    // SEO meta tags
+    const pageTitle = model && model.name
+        ? `${model.name}${model.set_num ? ` (${model.set_num})` : ""} - LEGO MOC Building Instructions | BrickOasis`
+        : "Loading... | BrickOasis";
+
+    const pageDescription = model && model.name
+        ? `${model.description || `Download ${model.name} LEGO MOC building instructions.`} ${model.total_parts ? `Features ${model.total_parts} pieces` : ""}${model.total_steps ? ` across ${model.total_steps} building steps` : ""}. ${isFree ? "Free download " : model.price ? `$${model.price} ` : ""}with 3D viewer and complete parts list.`
+        : "View LEGO MOC building instructions with 3D viewer.";
+
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>{pageTitle}</title>
+                <meta name="description" content={pageDescription} />
+                <meta property="og:type" content="product" />
+                <link rel="canonical" href={window.location.href} />
+            </Head>
+
             <Header
                 currentPage="store"
                 onOpenAuthModal={() => setShowAuthModal(true)}

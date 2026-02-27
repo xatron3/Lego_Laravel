@@ -770,7 +770,7 @@ class MocController extends Controller
             'color_rgb' => $invPart->color?->rgb ?? '000000',
             'quantity' => 0,
             'is_spare' => $invPart->is_spare,
-            'image_url' => "https://cdn.rebrickable.com/media/parts/ldraw/{$invPart->color_id}/{$invPart->part_num}.png",
+            'image_url' => "https://cdn.brickoasis.com/images/parts/{$invPart->color_id}/{$invPart->part_num}.png",
             'photo_url' => $element ? "https://cdn.rebrickable.com/media/parts/elements/{$element->element_id}.jpg" : null,
             'bricklink_url' => "https://www.bricklink.com/v2/catalog/catalogitem.page?P={$invPart->part_num}&C={$invPart->color_id}",
           ];

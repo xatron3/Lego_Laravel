@@ -143,9 +143,13 @@ class LegoModelController extends Controller
   /**
    * Helper methods for Rebrickable CDN URLs
    */
+  /**
+   * Get custom CDN image URL for a part.
+   * Uses BrickOasis CDN with pattern: /images/parts/{color_id}/{part_num}.jpg
+   */
   private function getPartImageUrl(string $partNum, int $colorId): string
   {
-    return "https://cdn.rebrickable.com/media/parts/ldraw/{$colorId}/{$partNum}.png";
+    return "https://cdn.brickoasis.com/images/parts/{$colorId}/{$partNum}.png";
   }
 
   private function getPartPhotoUrl(string $elementId): string

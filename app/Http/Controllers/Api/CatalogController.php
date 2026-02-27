@@ -80,7 +80,7 @@ class CatalogController extends Controller
 
     // Add image URLs
     $result->getCollection()->transform(function ($set) {
-      $set->image_url = $this->getSetImageUrl($set->set_num, $set->custom_image);
+      $set->image_url = $this->getSetImageUrl($set->set_num, $set->img_url, $set->custom_image);
       return $set;
     });
 
@@ -96,7 +96,7 @@ class CatalogController extends Controller
       ->where('set_num', $setNum)
       ->firstOrFail();
 
-    $set->image_url = $this->getSetImageUrl($set->set_num, $set->custom_image);
+    $set->image_url = $this->getSetImageUrl($set->set_num, $set->img_url, $set->custom_image);
     $set->bricklink_url = $this->getSetBricklinkUrl($set->set_num);
 
     // Aggregate parts from all inventories (usually just one)
@@ -134,7 +134,7 @@ class CatalogController extends Controller
             'name' => $invMinifig->minifig?->name ?? 'Unknown',
             'num_parts' => $invMinifig->minifig?->num_parts ?? 0,
             'quantity' => 0,
-            'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num, $invMinifig->minifig?->custom_image),
+            'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num, $invMinifig->minifig?->img_url, $invMinifig->minifig?->custom_image),
             'bricklink_url' => $this->getMinifigBricklinkUrl($invMinifig->fig_num),
           ];
         }
@@ -283,7 +283,7 @@ class CatalogController extends Controller
           'num_parts' => $set->num_parts,
           'quantity' => 0,
           'colors' => [],
-          'image_url' => $this->getSetImageUrl($set->set_num, $set->custom_image),
+          'image_url' => $this->getSetImageUrl($set->set_num, $set->img_url, $set->custom_image),
           'bricklink_url' => $this->getSetBricklinkUrl($set->set_num),
         ];
       }
@@ -343,7 +343,7 @@ class CatalogController extends Controller
 
     // Add image URLs
     $result->getCollection()->transform(function ($minifig) {
-      $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num, $minifig->custom_image);
+      $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num, $minifig->img_url, $minifig->custom_image);
       return $minifig;
     });
 
@@ -359,7 +359,7 @@ class CatalogController extends Controller
       ->where('fig_num', $figNum)
       ->firstOrFail();
 
-    $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num, $minifig->custom_image);
+    $minifig->image_url = $this->getMinifigImageUrl($minifig->fig_num, $minifig->img_url, $minifig->custom_image);
     $minifig->bricklink_url = $this->getMinifigBricklinkUrl($minifig->fig_num);
 
     // Get sets that contain this minifig
@@ -377,7 +377,7 @@ class CatalogController extends Controller
           'theme' => $set->theme?->name,
           'num_parts' => $set->num_parts,
           'quantity' => 0,
-          'image_url' => $this->getSetImageUrl($set->set_num, $set->custom_image),
+          'image_url' => $this->getSetImageUrl($set->set_num, $set->img_url, $set->custom_image),
           'bricklink_url' => $this->getSetBricklinkUrl($set->set_num),
         ];
       }
@@ -524,7 +524,7 @@ class CatalogController extends Controller
           'name' => $set->name,
           'year' => $set->year,
           'num_parts' => $set->num_parts,
-          'image_url' => $this->getSetImageUrl($set->set_num),
+          'image_url' => $this->getSetImageUrl($set->set_num, $set->img_url),
           'bricklink_url' => $this->getSetBricklinkUrl($set->set_num),
         ];
       });
@@ -617,10 +617,13 @@ class CatalogController extends Controller
 
   /**
    * Get image URL for a set.
-   * Uses custom image if available, otherwise falls back to Rebrickable CDN.
+   * Priority: img_url from CSV > custom uploaded image > Rebrickable CDN fallback.
    */
-  private function getSetImageUrl(string $setNum, ?string $customImage = null): string
+  private function getSetImageUrl(string $setNum, ?string $imgUrl = null, ?string $customImage = null): string
   {
+    if ($imgUrl) {
+      return $imgUrl;
+    }
     if ($customImage) {
       return "/storage/{$customImage}";
     }
@@ -628,13 +631,12 @@ class CatalogController extends Controller
   }
 
   /**
-   * Get Rebrickable image URL for a part.
-   * Returns primary URL (LDraw render). Frontend should fallback to element photos if this fails.
+   * Get custom CDN image URL for a part.
+   * Uses BrickOasis CDN with pattern: /images/parts/{color_id}/{part_num}.jpg
    */
   private function getPartImageUrl(string $partNum, int $colorId): string
   {
-    // Primary: LDraw renders (not all parts have these)
-    return "https://cdn.rebrickable.com/media/parts/ldraw/{$colorId}/{$partNum}.png";
+    return "https://cdn.brickoasis.com/images/parts/{$colorId}/{$partNum}.png";
   }
 
   /**
@@ -648,10 +650,13 @@ class CatalogController extends Controller
 
   /**
    * Get image URL for a minifig.
-   * Uses custom image if available, otherwise falls back to Rebrickable CDN.
+   * Priority: img_url from CSV > custom uploaded image > Rebrickable CDN fallback.
    */
-  private function getMinifigImageUrl(string $figNum, ?string $customImage = null): string
+  private function getMinifigImageUrl(string $figNum, ?string $imgUrl = null, ?string $customImage = null): string
   {
+    if ($imgUrl) {
+      return $imgUrl;
+    }
     if ($customImage) {
       return "/storage/{$customImage}";
     }
@@ -738,7 +743,7 @@ class CatalogController extends Controller
       if ($set->moc) {
         $set->image_url = $set->moc->thumbnail;
       } else {
-        $set->image_url = $this->getSetImageUrl($set->set_num, $set->custom_image);
+        $set->image_url = $this->getSetImageUrl($set->set_num, $set->img_url, $set->custom_image);
       }
       return $set;
     });
@@ -809,7 +814,7 @@ class CatalogController extends Controller
               'name' => $invMinifig->minifig?->name ?? 'Unknown',
               'num_parts' => $invMinifig->minifig?->num_parts ?? 0,
               'quantity' => 0,
-              'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num, $invMinifig->minifig?->custom_image),
+              'image_url' => $this->getMinifigImageUrl($invMinifig->fig_num, $invMinifig->minifig?->img_url, $invMinifig->minifig?->custom_image),
               'bricklink_url' => $this->getMinifigBricklinkUrl($invMinifig->fig_num),
             ];
           }
@@ -909,7 +914,7 @@ class CatalogController extends Controller
           'id' => $part->part_num,
           'name' => $part->name,
           'subtitle' => $part->part_num,
-          'image_url' => $part->custom_image ? "/storage/{$part->custom_image}" : "https://cdn.rebrickable.com/media/parts/ldraw/0/{$part->part_num}.png",
+          'image_url' => $part->custom_image ? "/storage/{$part->custom_image}" : $this->getPartImageUrl($part->part_num, 0),
           'url' => "/catalog/parts/{$part->part_num}",
         ];
       }

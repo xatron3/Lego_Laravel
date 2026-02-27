@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { Link } from "@inertiajs/react";
+import { Link, Head } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
 import Footer from "../components/Footer";
@@ -64,6 +64,34 @@ export default function Catalog({
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    LEGO Catalog - Browse Sets, Parts, Minifigs & MOCs |
+                    BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content={`Explore our comprehensive LEGO catalog featuring ${stats.sets?.toLocaleString()} official sets, ${stats.mocs?.toLocaleString()} MOCs, ${stats.parts?.toLocaleString()} unique parts, and ${stats.minifigs?.toLocaleString()} minifigures. Search, filter, and discover LEGO building resources.`}
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO catalog, LEGO sets, LEGO parts, LEGO minifigs, MOC library, BrickLink alternative, LEGO database, LEGO themes, building instructions"
+                />
+                <meta
+                    property="og:title"
+                    content="LEGO Catalog - Browse Sets, Parts & MOCs | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content={`Comprehensive LEGO catalog with ${stats.sets?.toLocaleString()} sets, ${stats.parts?.toLocaleString()} parts, and ${stats.minifigs?.toLocaleString()} minifigures. Your complete LEGO building resource.`}
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/catalog`}
+                />
+            </Head>
+
             <Header
                 currentPage="catalog"
                 onOpenAuthModal={() => setShowAuthModal(true)}

@@ -97,9 +97,32 @@ export default function Profile({
         { month: "long", year: "numeric" },
     );
 
+    const pageTitle = `${profileUser.name} (@${profileUser.username}) - LEGO Builder Profile | BrickOasis`;
+    const pageDescription = profileUser.bio
+        ? `${profileUser.bio} - ${stats.posts_count} builds, ${stats.followers_count} followers. View ${profileUser.name}'s LEGO creations on BrickOasis.`
+        : `${profileUser.name}'s LEGO builder profile. ${stats.posts_count} builds, ${stats.followers_count} followers, ${stats.following_count} following. Member since ${joinDate}.`;
+
     return (
         <div className="min-h-screen bg-gray-900">
-            <Head title={`${profileUser.name} (@${profileUser.username})`} />
+            <Head>
+                <title>{pageTitle}</title>
+                <meta name="description" content={pageDescription} />
+                <meta
+                    name="keywords"
+                    content={`${profileUser.name}, LEGO builder, @${profileUser.username}, LEGO profile, builder community`}
+                />
+                <meta property="og:title" content={pageTitle} />
+                <meta property="og:description" content={pageDescription} />
+                <meta property="og:type" content="profile" />
+                {profileUser.avatar && (
+                    <meta property="og:image" content={profileUser.avatar} />
+                )}
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/u/${profileUser.username}`}
+                />
+            </Head>
+
             <Header />
 
             {/* Profile Header */}

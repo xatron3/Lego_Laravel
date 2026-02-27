@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Head } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
 import Footer from "../components/Footer";
@@ -75,6 +76,33 @@ export default function CatalogMinifigs() {
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    LEGO Minifigures - Browse All Minifigs | BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content="Explore the complete LEGO minifigure catalog. Search and discover minifigs from all themes with detailed parts inventory, appearance history, and compatible sets. Perfect for collectors and enthusiasts."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO minifigures, LEGO minifigs, collectible minifigs, minifig catalog, LEGO characters, BrickLink minifigures"
+                />
+                <meta
+                    property="og:title"
+                    content="LEGO Minifigures - Complete Database | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Browse thousands of LEGO minifigures with detailed information, parts inventory, and appearance history."
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/catalog/minifigs`}
+                />
+            </Head>
+
             <Header
                 currentPage="catalog"
                 onOpenAuthModal={() => setShowAuthModal(true)}

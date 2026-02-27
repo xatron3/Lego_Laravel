@@ -425,9 +425,6 @@ function TableRow({ part }: CardProps) {
                 <span className="bg-gray-700 px-2 py-1 rounded text-white font-medium">
                     {part.count}×
                 </span>
-                {part.isSpare && (
-                    <span className="ml-2 text-xs text-gray-400">(spare)</span>
-                )}
             </td>
             <td className="px-4 py-3 text-center">
                 {part.bricklinkUrl ? (

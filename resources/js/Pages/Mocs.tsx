@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, router } from "@inertiajs/react";
+import { Link, router, Head } from "@inertiajs/react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import AuthModal from "../components/AuthModal";
@@ -105,6 +105,30 @@ export default function Mocs({
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    MOC Store - Premium LEGO Instructions | BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content="Download premium LEGO MOC building instructions. Browse hundreds of unique designs with step-by-step instructions, parts lists, and 3D viewer. Free and paid models available."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO MOCs, MOC building instructions, LEGO designs, LEGO MOC marketplace, premium instructions, LEGO MOC store"
+                />
+                <meta
+                    property="og:title"
+                    content="MOC Store - Premium Instructions | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Download LEGO MOC building instructions with 3D viewer and detailed parts lists. Hundreds of unique designs available."
+                />
+                <meta property="og:type" content="website" />
+                <link rel="canonical" href={`${window.location.origin}/mocs`} />
+            </Head>
+
             <Header
                 onOpenAuthModal={() => setShowAuthModal(true)}
                 currentPage="store"

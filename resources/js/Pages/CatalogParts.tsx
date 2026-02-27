@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Head } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
 import Footer from "../components/Footer";
@@ -118,6 +119,33 @@ export default function CatalogParts({
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    LEGO Parts - Search Parts by Category & Color | BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content="Comprehensive LEGO parts database. Search and filter parts by category, color, and compatible sets. Essential resource for MOC builders and LEGO collectors with detailed part information and images."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO parts, LEGO pieces, brick catalog, building parts, BrickLink parts, LEGO elements, part categories, LEGO colors"
+                />
+                <meta
+                    property="og:title"
+                    content="LEGO Parts Database - Search & Filter | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Browse thousands of LEGO parts with advanced filtering by category and color. Perfect for builders and collectors."
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/catalog/parts`}
+                />
+            </Head>
+
             <Header
                 currentPage="catalog"
                 onOpenAuthModal={() => setShowAuthModal(true)}

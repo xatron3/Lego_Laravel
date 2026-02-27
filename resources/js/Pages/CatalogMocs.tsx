@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Head } from "@inertiajs/react";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
 import Footer from "../components/Footer";
@@ -105,6 +106,33 @@ export default function CatalogMocs({ themes }: CatalogMocsProps) {
 
     return (
         <div className="min-h-screen bg-gray-900">
+            <Head>
+                <title>
+                    LEGO MOCs - Building Instructions Library | BrickOasis
+                </title>
+                <meta
+                    name="description"
+                    content="Browse LEGO MOCs (My Own Creations) with building instructions. Discover unique designs, alternative builds, and community creations. Filter by theme, parts count, and price."
+                />
+                <meta
+                    name="keywords"
+                    content="LEGO MOCs, MOC building instructions, alternative builds, My Own Creations, custom designs, BrickLink, Rebrickable"
+                />
+                <meta
+                    property="og:title"
+                    content="LEGO MOC Library | BrickOasis"
+                />
+                <meta
+                    property="og:description"
+                    content="Discover and download custom LEGO building instructions. Browse community creations and unique designs."
+                />
+                <meta property="og:type" content="website" />
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/catalog/mocs`}
+                />
+            </Head>
+
             <Header
                 currentPage="catalog"
                 onOpenAuthModal={() => setShowAuthModal(true)}
@@ -117,10 +145,10 @@ export default function CatalogMocs({ themes }: CatalogMocsProps) {
             <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-white mb-2">
-                        MOCs (My Own Creations)
+                        Custom LEGO Builds
                     </h1>
                     <p className="text-gray-400">
-                        Custom LEGO builds from the community
+                        Community-designed LEGO creations
                     </p>
                 </div>
 

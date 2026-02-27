@@ -69,9 +69,35 @@ export default function PostDetail({ post: initialPost }: PostDetailProps) {
 
     const postTypeLabel = post.type === "build" ? "LEGO Build" : post.type;
 
+    const pageTitle = post.title
+        ? `${post.title} - ${post.user.name}'s ${postTypeLabel} | BrickOasis`
+        : `${post.user.name}'s ${postTypeLabel} | BrickOasis`;
+
+    const pageDescription = post.description
+        ? `${post.description.substring(0, 150)}${post.description.length > 150 ? "..." : ""} - Shared by ${post.user.name} on BrickOasis LEGO community.`
+        : `View ${post.user.name}'s ${postTypeLabel} on BrickOasis. Join the LEGO builder community to share and discover amazing creations.`;
+
     return (
         <div className="min-h-screen bg-gray-900">
-            <Head title={post.title || "Post"} />
+            <Head>
+                <title>{pageTitle}</title>
+                <meta name="description" content={pageDescription} />
+                <meta
+                    name="keywords"
+                    content={`LEGO build, ${post.user.name}, LEGO community, LEGO creation, builder showcase`}
+                />
+                <meta property="og:title" content={pageTitle} />
+                <meta property="og:description" content={pageDescription} />
+                <meta property="og:type" content="article" />
+                {post.images && post.images.length > 0 && (
+                    <meta property="og:image" content={post.images[0].url} />
+                )}
+                <link
+                    rel="canonical"
+                    href={`${window.location.origin}/community/posts/${post.id}`}
+                />
+            </Head>
+
             <Header />
 
             <div className="max-w-2xl mx-auto px-4 pt-24 pb-12">
