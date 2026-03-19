@@ -42,7 +42,7 @@ class PageController extends Controller
 
     // Get popular themes (top 6 by set count)
     $popularThemes = \App\Models\Theme::withCount('sets')
-      ->having('sets_count', '>', 0)
+      ->whereHas('sets')
       ->orderBy('sets_count', 'desc')
       ->limit(6)
       ->get(['id', 'name'])
